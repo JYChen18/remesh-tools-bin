@@ -1,0 +1,51 @@
+[build-system]
+requires = [
+  "scikit-build-core>=0.10",
+  "cmake>=3.22",
+  "ninja",
+]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "acvd-bin"
+version = "0.1.0"
+description = "uv-installable wrapper for the official ACVD command line tools"
+readme = "README.md"
+requires-python = ">=3.8,<3.14"
+license = { file = "third_party/ACVD/LICENSE.txt" }
+authors = [
+  { name = "acvd-bin maintainers" },
+]
+dependencies = [
+  "vtk==9.4.0",
+]
+
+[project.urls]
+ACVD = "https://github.com/valette/ACVD"
+Repository = "https://github.com/JYChen18/acvd-bin"
+
+[project.scripts]
+ACVD = "acvd_bin._cli:acvd"
+ACVDP = "acvd_bin._cli:acvdp"
+ACVDQ = "acvd_bin._cli:acvdq"
+ACVDQP = "acvd_bin._cli:acvdqp"
+AnisotropicRemeshing = "acvd_bin._cli:anisotropic_remeshing"
+AnisotropicRemeshingQ = "acvd_bin._cli:anisotropic_remeshing_q"
+AnisotropicRemeshingQP = "acvd_bin._cli:anisotropic_remeshing_qp"
+VolumeAnalysis = "acvd_bin._cli:volume_analysis"
+acvd-bin = "acvd_bin._cli:dispatch"
+
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+build-dir = "build/{wheel_tag}"
+wheel.packages = ["src/acvd_bin"]
+sdist.include = [
+  "CMakeLists.txt",
+  "README.md",
+  "src/acvd_bin/**",
+  "third_party/ACVD/**",
+  "tools/**",
+]
+
+[tool.scikit-build.cmake]
+build-type = "Release"
