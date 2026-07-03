@@ -86,14 +86,14 @@ def _safe_extract(archive: Path, dest: Path) -> None:
 
 
 def _find_vtk_dir(root: Path) -> Path:
-    candidates = sorted(root.rglob("VTKConfig.cmake"))
+    candidates = sorted(root.rglob("VTKConfig.cmake")) + sorted(root.rglob("vtk-config.cmake"))
     if not candidates:
-        raise RuntimeError(f"Could not find VTKConfig.cmake under {root}")
+        raise RuntimeError(f"Could not find VTKConfig.cmake or vtk-config.cmake under {root}")
 
     preferred = [
         path
         for path in candidates
-        if "lib" in path.parts and "cmake" in path.parts and any(part.startswith("vtk-") for part in path.parts)
+        if "cmake" in path.parts and any(part.startswith("vtk-") for part in path.parts)
     ]
     return (preferred or candidates)[0].parent
 

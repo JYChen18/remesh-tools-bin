@@ -1,8 +1,6 @@
 [build-system]
 requires = [
   "scikit-build-core>=0.10",
-  "cmake>=3.22",
-  "ninja",
 ]
 build-backend = "scikit_build_core.build"
 

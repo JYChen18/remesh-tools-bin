@@ -31,8 +31,8 @@ endif()
 
 include("${ACVD_BIN_VTK_SDK_INFO}")
 
-if(NOT EXISTS "${ACVD_BIN_VTK_DIR}/VTKConfig.cmake")
-  message(FATAL_ERROR "VTKConfig.cmake was not found in the prepared SDK: ${ACVD_BIN_VTK_DIR}")
+if(NOT EXISTS "${ACVD_BIN_VTK_DIR}/VTKConfig.cmake" AND NOT EXISTS "${ACVD_BIN_VTK_DIR}/vtk-config.cmake")
+  message(FATAL_ERROR "VTK package config was not found in the prepared SDK: ${ACVD_BIN_VTK_DIR}")
 endif()
 
 # Force ACVD to use the uv/build-managed VTK SDK instead of falling back to a
@@ -58,6 +58,10 @@ set(BUILD_DOCUMENTATION OFF CACHE BOOL "" FORCE)
 set(BUILD_DISCRETEREMESHING ON CACHE BOOL "" FORCE)
 set(BUILD_VOLUMEPROCESSING OFF CACHE BOOL "" FORCE)
 set(BUILD_EXAMPLES ON CACHE BOOL "" FORCE)
+
+if(UNIX AND NOT APPLE)
+  add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
+endif()
 
 if(APPLE)
   set(CMAKE_INSTALL_RPATH "@loader_path/../lib;@loader_path/../../../vtkmodules")
