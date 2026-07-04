@@ -38,6 +38,16 @@ def _vtkmodules_dir() -> Path:
     return Path(vtkmodules.__file__).resolve().parent
 
 
+def _vtk_library_dirs() -> tuple[Path, ...]:
+    vtkmodules_dir = _vtkmodules_dir()
+    candidates = (
+        vtkmodules_dir / ".dylibs",
+        vtkmodules_dir / ".libs",
+        vtkmodules_dir,
+    )
+    return tuple(path for path in candidates if path.exists())
+
+
 def available_tools() -> tuple[str, ...]:
     return tuple(sorted(_TOOLS))
 
@@ -61,7 +71,7 @@ def _prepend_path(env: dict[str, str], key: str, paths: Iterable[Path]) -> None:
 
 def _native_env() -> dict[str, str]:
     env = os.environ.copy()
-    lib_paths = [_native_lib_dir(), _vtkmodules_dir()]
+    lib_paths = [_native_lib_dir(), *_vtk_library_dirs()]
 
     if os.name == "nt":
         _prepend_path(env, "PATH", lib_paths)

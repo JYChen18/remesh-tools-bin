@@ -64,9 +64,9 @@ if(UNIX AND NOT APPLE)
 endif()
 
 if(APPLE)
-  set(CMAKE_INSTALL_RPATH "@loader_path/../lib;@loader_path/../../../vtkmodules")
+  set(CMAKE_INSTALL_RPATH "@loader_path/../lib;@loader_path/../../../vtkmodules/.dylibs;@loader_path/../../../vtkmodules/.libs;@loader_path/../../../vtkmodules")
 elseif(UNIX)
-  set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib;$ORIGIN/../../../vtkmodules")
+  set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib;$ORIGIN/../../../vtkmodules/.dylibs;$ORIGIN/../../../vtkmodules/.libs;$ORIGIN/../../../vtkmodules")
 endif()
 set(CMAKE_INSTALL_RPATH_USE_LINK_PATH FALSE)
 
