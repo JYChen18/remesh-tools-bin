@@ -1,0 +1,476 @@
+{
+  "dataDirs" : {
+	  "ACVD" : {
+		  "path" : "./js",
+		  "hidden" : true
+	  }
+  },
+  "init" : [
+	"ACVD/ACVD.js"
+  ],
+  "include" : [ "./ACVD.js" ],
+  "actions": {
+		"flipToRAS" : {
+			"parameters" : [
+				{
+					"name" : "inputDirectory",
+					"type" : "directory",
+					"prefix" : "-d "
+				},
+				{
+					"name" : "inputVolume",
+					"type" : "file",
+					"prefix" : "-f "
+				},
+				{
+					"text" : "-o ./"
+				},
+				{
+					"name" : "outputFileName",
+					"type" : "string",
+					"prefix" : "-of "
+				}
+			],
+			"executable" : "python/flipToRAS.py",
+			"engine" : "python3"
+		},
+		"icp": {
+			"parameters": [
+				{
+					"name": "sourceMesh",
+					"type": "file",
+					"required": "true"
+				},
+				{
+					"name": "targetMesh",
+					"type": "file",
+					"required": "true"
+				}
+			],
+			"executable": "bin/icp"
+		},
+		"meshDifference": {
+			"parameters": [
+				{
+					"name": "meshes",
+					"type": "file",
+					"required": "true"
+				}
+			],
+			"executable": "bin/meshDifference"
+		},
+		"clipMesh": {
+			"parameters": [
+				{
+					"name": "inputMesh",
+					"type": "file",
+					"required": "true"
+				},
+				{
+					"name": "ox",
+					"type": "float",
+					"required": true
+				},
+				{
+					"name": "oy",
+					"type": "float",
+					"required": true
+				},
+				{
+					"name": "oz",
+					"type": "float",
+					"required": true
+				},
+				{
+					"name": "nx",
+					"type": "float",
+					"required": true
+				},
+				{
+					"name": "ny",
+					"type": "float",
+					"required": true
+				},
+				{
+					"name": "nz",
+					"type": "float",
+					"required": true
+				},
+				{
+					"text" : "-d 0"
+				}
+			],
+			"executable": "bin/clipMesh"
+		},
+		"VolumeOOCSlice": {
+			"parameters": [
+				{
+					"name": "inputVolume",
+					"type": "file",
+					"required": "true"
+				},
+				{
+					"name": "slice",
+					"type": "int",
+					"required": true
+				}
+			],
+			"executable": "bin/VolumeOOCSlice"
+		},
+		"extractMeshes": {
+			"alias" : "extract_meshes",
+			"description": "Generates meshes from labeled volume data : marching cubes + simplification + smoothing",
+			"parameters": [
+				{
+					"name": "inputVolume",
+					"alias": "input_volume",
+					"type": "file",
+					"required": true
+				},
+				{
+					"name": "numberOfVertices",
+					"alias": "max_number_of_vertices",
+					"type": "int",
+					"min": "-1",
+					"defaultValue": 10000,
+					"prefix": "-n "
+				},
+				{
+					"name": "simplification_method",
+					"type": "int",
+					"min": 0,
+					"max": 1,
+					"defaultValue": 0,
+					"prefix": "-s "
+				},
+				{
+					"name": "number_of_smoothing_steps",
+					"type": "int",
+					"min": 0,
+					"defaultValue": 0,
+					"prefix": "-sm "
+				},
+				{
+					"name": "gradation",
+					"type": "float",
+					"min": 0,
+					"max": 3,
+					"defaultValue": 0,
+					"prefix": "-g "
+				},
+				{
+					"name": "format",
+					"type": "string",
+					"defaultValue": "vtk",
+					"prefix": "-f "
+				},
+				{
+					"name": "forceManifold",
+					"alias": "manifold_output",
+					"type": "int",
+					"min": 0,
+					"max": 1,
+					"prefix": "-fill 1 -m "
+				},
+				{
+					"name": "anisotropy",
+					"type": "int",
+					"defaultValue": 0,
+					"min": 0,
+					"max": 1,
+					"prefix": "-a "
+				},
+				{
+					"name": "num_voxel_max",
+					"info": "defines the maximum number of input voxels. If the input volume has more, it will be resampled to this number",
+					"type": "int",
+					"min": 0,
+					"prefix": "-v "
+				},
+				{
+					"name": "cleaning",
+					"type": "int",
+					"defaultValue": 0,
+					"min": 0,
+					"max": 1,
+					"prefix": "-c "
+				},
+				{
+					"name": "fill_holes",
+					"type": "int",
+					"defaultValue": 0,
+					"min": 0,
+					"max": 1,
+					"prefix": "-fill "
+				},
+				{
+					"name": "colors",
+					"type": "file",
+					"prefix": "-x "
+				},
+				{
+					"name": "threshold",
+					"type": "float",
+					"prefix": "-t "
+				},
+				{
+					"name": "masks",
+					"type": "string",
+					"prefix": "-masks "
+				}
+			],
+			"executable": "bin/VolumeAnalysis"
+		},
+		"mesh2vtk": {
+			"description": "Converts a mesh into a vtk format",
+			"parameters": [
+				{
+					"name": "inputMesh",
+					"alias": "input_mesh",
+					"type": "file",
+					"required": "true"
+				}
+			],
+			"executable": "bin/mesh2vtk"
+		},
+		"mesh2stl": {
+			"description": "Converts a mesh into a vtk format",
+			"parameters": [
+				{
+					"name": "inputMesh",
+					"type": "file",
+					"required": "true"
+				}
+			],
+			"executable": "bin/mesh2stl"
+		},
+		"mesh2obj": {
+			"description": "Converts a mesh into obj format",
+			"parameters": [
+				{
+					"name": "inputMesh",
+					"type": "file",
+					"required": "true"
+				}
+			],
+			"executable": "bin/mesh2obj"
+		},
+		"slice_volume": {
+			"statify" : true,
+			"description": "Computes slices from volume data",
+			"parameters": [
+				{
+					"name": "inputVolume",
+					"alias": "input_volume",
+					"type": "file",
+					"required": true
+				},
+				{
+					"prefix": "-f ",
+					"name": "format",
+					"type": "int",
+					"min": 0,
+					"max": 1
+				},
+				{
+					"prefix": "-orientation ",
+					"name": "slice_orientation",
+					"type": "int",
+					"required": true,
+					"min": 0,
+					"max": 2
+				},
+				{
+					"prefix": "-uc ",
+					"name": "convert_to_uchar",
+					"type": "int",
+					"min": 0,
+					"max": 1
+				},
+				{
+					"prefix": "-s ",
+					"name": "sampling_ratio",
+					"type": "float"
+				}
+			],
+			"executable": "bin/VolumeSlice",
+			"permissions": 0
+		},
+		"volumeMedianFiltering": {
+			"alias" : "volume_median_filtering",
+			"description": "Computes median filtering for volume data",
+			"parameters": [
+				{
+					"name": "inputVolume",
+					"alias": "input_volume",
+					"type": "file",
+					"required": "true"
+				},
+				{
+					"name": "kernel_size",
+					"type": "int",
+					"required": "true",
+					"defaultValue": 5,
+					"min": 1,
+					"max": 10
+				}
+			],
+			"executable": "bin/VolumeMedian"
+		},
+		"volumeAnisotropicDiffusion": {
+			"alias" : "volume_anisotropic_diffusion",
+			"parameters": [
+				{
+					"name": "inputVolume",
+					"alias": "input_volume",
+					"type": "file",
+					"required": "true"
+				},
+				{
+					"name": "number_of_iterations",
+					"type": "int",
+					"required": "true",
+					"min": 1
+				},
+				{
+					"prefix": "-t ",
+					"name": "diffusion_threshold",
+					"type": "float"
+				},
+				{
+					"prefix": "-f ",
+					"name": "diffusion_factor",
+					"type": "float"
+				}
+			],
+			"executable": "bin/VolumeAnisotropicDiffusion"
+		},
+		"volumeCrop": {
+			"parameters": [
+				{
+					"name": "inputVolume",
+					"type": "file",
+					"required": "true"
+				},
+				{
+					"text" : "output.nii.gz"
+				},
+				{
+					"name": "xMin",
+					"type": "int",
+					"required": "true"
+				},
+				{
+					"name": "xMax",
+					"type": "int",
+					"required": "true"
+				},
+				{
+					"name": "yMin",
+					"type": "int",
+					"required": "true"
+				},
+				{
+					"name": "yMax",
+					"type": "int",
+					"required": "true"
+				},
+				{
+					"name": "zMin",
+					"type": "int",
+					"required": "true"
+				},
+				{
+					"name": "zMax",
+					"type": "int",
+					"required": "true"
+				}
+			],
+			"executable": "bin/VolumeCrop"
+		},
+		"img2raw": {
+			"parameters": [
+				{
+					"text": "-o output.mhd"
+				},
+				{
+					"name": "input_directory",
+					"type": "directory",
+					"required": true
+				}
+			],
+			"executable": "bin/img2raw",
+			"noCache": true
+		},
+		"sampleMesh" : {
+			"parameters" : [
+				{
+					"name" : "inputMesh",
+					"type" : "file",
+					"required" : true
+				},
+				{
+					"name" : "numberOfSamples",
+					"type" : "int",
+					"required" : true
+				},
+				{
+					"name" : "numberOfButterflySubdivisions",
+					"type" : "int"
+				}
+			],
+			"executable" : "bin/sampleMesh"
+		},
+		"mesh2off": {
+		  "description": "Converts a mesh to off format",
+		  "parameters": [
+			{
+			  "name": "inputMesh",
+			  "type": "file",
+			  "required": true
+			}
+		  ],
+		  "executable": "bin/mesh2off"
+		},
+		"mesh2ply": {
+		  "description": "Converts a mesh to ply format",
+		  "parameters": [
+			{
+			  "name": "inputMesh",
+			  "type": "file",
+			  "required": true
+			},
+			{
+			  "name": "clean",
+			  "type": "flag",
+			  "prefix" : "1"
+			}
+		  ],
+		  "executable": "bin/mesh2ply"
+		},
+		"subdivideMesh": {
+		  "description": "Subdivides a mesh using Loop or butterfly subdivision",
+		  "parameters": [
+			{
+			  "name": "inputMesh",
+			  "type": "file",
+			  "required": true
+			},
+			{
+			  "name": "subdivisionType",
+			  "type": "int",
+			  "info" : "defines the subdivision type : 0=loop, 1=butterfly",
+			  "defaultValue" : "1"
+			},
+			{
+			  "name": "numberOfSubdivisions",
+			  "type": "int",
+			  "info" : "defines the number of subdivision levels",
+			  "defaultValue" : 1
+			},
+			{ "text" : " 0" }
+		  ],
+		  "executable": "bin/subdivideMesh2"
+		}
+	}
+}
