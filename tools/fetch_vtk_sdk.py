@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch and expose the official VTK wheel SDK archive for ACVD builds."""
+"""Fetch and expose the official VTK wheel SDK archive for remesh-tools-bin builds."""
 
 from __future__ import annotations
 
@@ -58,7 +58,7 @@ def _download(url: str, archive: Path) -> None:
 
     tmp = archive.with_name(f"{archive.name}.{os.getpid()}.part")
     print(f"Downloading {url}", flush=True)
-    request = urllib.request.Request(url, headers={"User-Agent": "acvd-bin-build"})
+    request = urllib.request.Request(url, headers={"User-Agent": "remesh-tools-bin-build"})
     try:
         with urllib.request.urlopen(request, timeout=120) as response, tmp.open("xb") as handle:
             while True:
@@ -101,7 +101,7 @@ def _find_vtk_dir(root: Path) -> Path:
 def _write_cmake_output(path: Path, vtk_dir: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     escaped = str(vtk_dir).replace("\\", "/")
-    path.write_text(f'set(ACVD_BIN_VTK_DIR "{escaped}")\n', encoding="utf-8")
+    path.write_text(f'set(REMESH_TOOLS_BIN_VTK_DIR "{escaped}")\n', encoding="utf-8")
 
 
 def main() -> int:
@@ -112,9 +112,9 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.version != SUPPORTED_VERSION:
-        raise RuntimeError(f"acvd-bin is pinned to VTK {SUPPORTED_VERSION}, got {args.version}")
+        raise RuntimeError(f"remesh-tools-bin is pinned to VTK {SUPPORTED_VERSION}, got {args.version}")
 
-    override = os.environ.get("ACVD_BIN_VTK_SDK_DIR")
+    override = os.environ.get("REMESH_TOOLS_BIN_VTK_SDK_DIR")
     if override:
         vtk_dir = _find_vtk_dir(Path(override))
         _write_cmake_output(args.cmake_output, vtk_dir)
@@ -124,7 +124,7 @@ def main() -> int:
     archive_name = _sdk_archive_name(args.version)
     archive = args.dest / "downloads" / archive_name
     extract_root = args.dest / "extracted" / archive_name.removesuffix(".tar.xz")
-    stamp = extract_root / ".acvd-bin-extracted"
+    stamp = extract_root / ".remesh-tools-bin-extracted"
 
     _download(f"{BASE_URL}/{archive_name}", archive)
     if not stamp.exists():

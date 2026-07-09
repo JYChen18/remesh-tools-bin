@@ -4,5 +4,7 @@ __pycache__/
 .ruff_cache/
 .venv/
 build/
+CMakeCache.txt
+CMakeFiles/
 dist/
 *.egg-info/

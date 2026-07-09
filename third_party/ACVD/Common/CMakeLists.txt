@@ -36,6 +36,6 @@ install( FILES ${_vtkSurface_hdrs}
   DESTINATION ${INSTALL_INCLUDE_DIR}/ACVD/Common
 )
 
-if( BUILD_EXAMPLES )
+if( BUILD_EXAMPLES AND BUILD_COMMON_EXAMPLES )
   add_subdirectory( Examples )
 endif()
