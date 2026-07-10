@@ -8,42 +8,36 @@ tool.
 
 ## Installation
 
-The package is designed for:
+### Install from PyPI
 
 ```bash
-uv add git+https://github.com/JYChen18/remesh-tools-bin.git
+uv add remesh-tools-bin
 ```
 
-Source installs compile native dependencies and may take roughly 5-15 minutes depending on machine/network.
+Prebuilt wheels support CPython 3.10-3.13 on Linux x86_64, Windows x86_64,
+and macOS 12 or newer on Intel or Apple Silicon.
 
-Published releases provide prebuilt wheels for Linux x86_64 (glibc 2.28 or
-newer), Windows x86_64, macOS Intel, and macOS Apple Silicon (macOS 12 or
-newer).
+### Build from Source
 
-### Requirements
+```bash
+git clone https://github.com/JYChen18/remesh-tools-bin.git
+cd remesh-tools-bin
+uv sync
+uv build --wheel
+```
 
-- CPython 3.10 through 3.13
-- A system C++ compiler/toolchain available to CMake. `uv` does not install
-  GCC, Clang, MSVC, or Xcode Command Line Tools.
+The wheel is written to `dist/`.
 
 ## Usage
-
-The installed launcher is:
-
-```bash
-remesh
-```
 
 ### ACVD Remeshing
 
 ACVD methods remesh a surface to a target vertex count. `--gradation 0`
 requests uniform remeshing; higher values give more influence to local
-curvature.
+curvature. A gradation of `1.5` with manifold output is a good default:
 
 ```bash
-remesh acvd input.obj output.ply --vertices 3000 --gradation 0
-remesh acvd-quadric input.obj output.ply --vertices 3000 --gradation 1.5
-remesh acvd-anisotropic-quadric input.obj output.ply --vertices 1000 --gradation 1.5
+uv run remesh acvd input.obj output.ply --vertices 3000 --gradation 1.5 --force-manifold 1
 ```
 
 Available ACVD methods:
@@ -66,7 +60,7 @@ The OpenVDB method reads OBJ meshes and writes OBJ meshes by converting the
 input surface to a signed distance field and extracting a new surface:
 
 ```bash
-remesh openvdb-sdf input.obj output.obj --resolution 50 --level-set 0.1
+uv run remesh openvdb-sdf input.obj output.obj --resolution 50 --level-set 0.1
 ```
 
 By default it normalizes the input mesh before applying the OpenVDB conversion
