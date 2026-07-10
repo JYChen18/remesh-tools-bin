@@ -68,6 +68,7 @@ def _vtk_library_dirs() -> tuple[Path, ...]:
     candidates = (
         vtkmodules_dir / ".dylibs",
         vtkmodules_dir / ".libs",
+        vtkmodules_dir.parent / "vtk.libs",
         vtkmodules_dir,
     )
     return tuple(path for path in candidates if path.exists())

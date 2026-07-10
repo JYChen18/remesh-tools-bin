@@ -10,6 +10,21 @@ from remesh_tools_bin import _cli
 
 
 class NativeEnvironmentTests(unittest.TestCase):
+    def test_includes_windows_vtk_library_directory(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            site_packages = Path(temporary_directory)
+            vtkmodules_dir = site_packages / "vtkmodules"
+            vtk_libs_dir = site_packages / "vtk.libs"
+            vtkmodules_dir.mkdir()
+            vtk_libs_dir.mkdir()
+
+            with mock.patch.object(
+                _cli, "_vtkmodules_dir", return_value=vtkmodules_dir
+            ):
+                library_dirs = _cli._vtk_library_dirs()
+
+            self.assertEqual(library_dirs, (vtk_libs_dir, vtkmodules_dir))
+
     def test_includes_delvewheel_library_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             site_packages = Path(temporary_directory)
