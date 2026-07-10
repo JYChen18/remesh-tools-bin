@@ -84,3 +84,4 @@ repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} --exclud
 
 [tool.cibuildwheel.windows]
 repair-wheel-command = 'delvewheel repair --ignore-existing --analyze-existing --analyze-existing-exes --exclude "vtk*.dll" -w {dest_dir} -v {wheel}'
+test-requires = ["pefile"]
