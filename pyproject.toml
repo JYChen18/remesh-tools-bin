@@ -10,7 +10,12 @@ version = "0.1.0"
 description = "Python package wrapper for native remeshing command line tools"
 readme = "README.md"
 requires-python = ">=3.8,<3.14"
-license = { file = "third_party/ACVD/LICENSE.txt" }
+license = "Apache-2.0"
+license-files = [
+  "LICENSE",
+  "licenses/*.txt",
+  "third_party/ACVD/LICENSE.txt",
+]
 authors = [
   { name = "remesh-tools-bin maintainers" },
 ]
@@ -33,9 +38,11 @@ wheel.packages = ["src/remesh_tools_bin"]
 sdist.inclusion-mode = "explicit"
 sdist.include = [
   "/CMakeLists.txt",
+  "/LICENSE",
   "/README.md",
   "/pyproject.toml",
   "/cmake/**",
+  "/licenses/**",
   "/native/**",
   "/src/remesh_tools_bin/**",
   "/third_party/ACVD/**",
