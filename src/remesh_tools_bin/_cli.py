@@ -46,6 +46,12 @@ def _native_lib_dir() -> Path:
     return Path(__file__).resolve().parent / "_native" / "lib"
 
 
+def _vendored_library_dirs() -> tuple[Path, ...]:
+    package_dir = Path(__file__).resolve().parent
+    candidate = package_dir.parent / "remesh_tools_bin.libs"
+    return (candidate,) if candidate.is_dir() else ()
+
+
 def _vtkmodules_dir() -> Path:
     try:
         import vtkmodules
@@ -90,7 +96,12 @@ def _prepend_path(env: dict[str, str], key: str, paths: Iterable[Path]) -> None:
 
 def _native_env() -> dict[str, str]:
     env = os.environ.copy()
-    lib_paths = [_native_lib_dir(), *_vtk_library_dirs()]
+    lib_paths = [
+        native_bin_dir(),
+        _native_lib_dir(),
+        *_vendored_library_dirs(),
+        *_vtk_library_dirs(),
+    ]
 
     if os.name == "nt":
         _prepend_path(env, "PATH", lib_paths)
