@@ -16,6 +16,10 @@ uv add git+https://github.com/JYChen18/remesh-tools-bin.git
 
 Source installs compile native dependencies and may take roughly 5-15 minutes depending on machine/network.
 
+Published releases provide prebuilt wheels for Linux x86_64 (glibc 2.28 or
+newer), Windows x86_64, macOS Intel, and macOS Apple Silicon (macOS 12 or
+newer).
+
 ### Requirements
 
 - CPython 3.10 through 3.13

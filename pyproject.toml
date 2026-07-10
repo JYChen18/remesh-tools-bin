@@ -35,6 +35,7 @@ remesh = "remesh_tools_bin._cli:main"
 minimum-version = "build-system.requires"
 build-dir = "build/{wheel_tag}"
 wheel.packages = ["src/remesh_tools_bin"]
+wheel.py-api = "py3"
 sdist.inclusion-mode = "explicit"
 sdist.include = [
   "/CMakeLists.txt",
@@ -61,3 +62,24 @@ sdist.exclude = [
 
 [tool.scikit-build.cmake]
 build-type = "Release"
+
+[tool.cibuildwheel]
+build = "cp313-*"
+skip = "*-musllinux*"
+archs = ["native"]
+test-sources = [
+  "tests/fixtures",
+  "tests/smoke_wheel.py",
+]
+test-command = "python tests/smoke_wheel.py"
+
+[tool.cibuildwheel.linux]
+manylinux-x86_64-image = "manylinux_2_28"
+repair-wheel-command = "auditwheel repair --exclude 'libvtk*.so*' -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.macos]
+environment = { MACOSX_DEPLOYMENT_TARGET = "12.0" }
+repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} --exclude vtkmodules -w {dest_dir} -v {wheel}"
+
+[tool.cibuildwheel.windows]
+repair-wheel-command = 'delvewheel repair --analyze-existing --analyze-existing-exes --exclude "vtk*.dll" -w {dest_dir} -v {wheel}'
