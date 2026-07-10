@@ -15,7 +15,17 @@ if(POLICY CMP0167)
 endif()
 
 set(Boost_USE_STATIC_LIBS ON CACHE BOOL "" FORCE)
-set(BOOST_INCLUDE_LIBRARIES iostreams system CACHE STRING "" FORCE)
+set(
+  BOOST_INCLUDE_LIBRARIES
+  algorithm
+  any
+  interprocess
+  iostreams
+  numeric/conversion
+  system
+  uuid
+  CACHE STRING "" FORCE
+)
 set(BOOST_IOSTREAMS_ENABLE_ZSTD OFF CACHE BOOL "" FORCE)
 set(BOOST_IOSTREAMS_ENABLE_LZMA OFF CACHE BOOL "" FORCE)
 set(BOOST_IOSTREAMS_ENABLE_BZIP2 OFF CACHE BOOL "" FORCE)
@@ -69,6 +79,15 @@ if(TARGET tbb)
   )
 endif()
 
+if(WIN32 AND NOT TARGET Boost::disable_autolinking)
+  add_library(remesh_tools_bin_boost_disable_autolinking INTERFACE)
+  target_compile_definitions(
+    remesh_tools_bin_boost_disable_autolinking
+    INTERFACE BOOST_ALL_NO_LIB
+  )
+  add_library(Boost::disable_autolinking ALIAS remesh_tools_bin_boost_disable_autolinking)
+endif()
+
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(OPENVDB_BUILD_CORE ON CACHE BOOL "" FORCE)
 set(OPENVDB_CORE_STATIC ON CACHE BOOL "" FORCE)
@@ -107,8 +126,17 @@ FetchContent_MakeAvailable(openvdb)
 
 set_target_properties(openvdb_static PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-if(TARGET Boost::disable_autolinking)
-  return()
-endif()
-
-add_library(Boost::disable_autolinking INTERFACE IMPORTED)
+# Boost's modular CMake targets expose only their own and declared dependency
+# include directories. OpenVDB 8 also includes these header-only libraries
+# directly, so restore the include propagation provided by classic FindBoost.
+foreach(
+  REMESH_TOOLS_BIN_BOOST_HEADER_COMPONENT
+  IN ITEMS algorithm any interprocess numeric_conversion uuid
+)
+  if(TARGET "Boost::${REMESH_TOOLS_BIN_BOOST_HEADER_COMPONENT}")
+    target_link_libraries(
+      openvdb_static
+      PUBLIC "Boost::${REMESH_TOOLS_BIN_BOOST_HEADER_COMPONENT}"
+    )
+  endif()
+endforeach()
