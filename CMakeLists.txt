@@ -14,7 +14,16 @@ endif()
 find_package(Python COMPONENTS Interpreter REQUIRED)
 
 set(REMESH_TOOLS_BIN_VTK_VERSION "9.5.2" CACHE STRING "VTK version used by remesh-tools-bin")
-set(REMESH_TOOLS_BIN_VTK_SDK_ROOT "${CMAKE_BINARY_DIR}/vtk-wheel-sdk" CACHE PATH "Extracted VTK wheel SDK root")
+if(WIN32 AND DEFINED ENV{TEMP})
+  string(MD5 REMESH_TOOLS_BIN_BUILD_ID "${CMAKE_BINARY_DIR}")
+  file(TO_CMAKE_PATH "$ENV{TEMP}" REMESH_TOOLS_BIN_TEMP_DIR)
+  set(REMESH_TOOLS_BIN_VTK_SDK_ROOT_DEFAULT
+    "${REMESH_TOOLS_BIN_TEMP_DIR}/rt-vtk-${REMESH_TOOLS_BIN_BUILD_ID}"
+  )
+else()
+  set(REMESH_TOOLS_BIN_VTK_SDK_ROOT_DEFAULT "${CMAKE_BINARY_DIR}/vtk-wheel-sdk")
+endif()
+set(REMESH_TOOLS_BIN_VTK_SDK_ROOT "${REMESH_TOOLS_BIN_VTK_SDK_ROOT_DEFAULT}" CACHE PATH "Extracted VTK wheel SDK root")
 set(REMESH_TOOLS_BIN_VTK_SDK_INFO "${CMAKE_BINARY_DIR}/remesh-tools-bin-vtk-sdk.cmake")
 
 execute_process(

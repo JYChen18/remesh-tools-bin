@@ -132,15 +132,16 @@ def main() -> int:
 
     archive_name = _sdk_archive_name(args.version)
     archive = args.dest / "downloads" / archive_name
-    extract_root = args.dest / "extracted" / archive_name.removesuffix(".tar.xz")
-    stamp = extract_root / ".remesh-tools-bin-extracted"
+    extract_root = args.dest / "extracted"
+    sdk_root = extract_root / archive_name.removesuffix(".tar.xz")
+    stamp = sdk_root / ".remesh-tools-bin-extracted"
 
     _download(f"{BASE_URL}/{archive_name}", archive)
     if not stamp.exists():
         _safe_extract(archive, extract_root)
         stamp.write_text("ok\n", encoding="utf-8")
 
-    vtk_dir = _find_vtk_dir(extract_root)
+    vtk_dir = _find_vtk_dir(sdk_root)
     _write_cmake_output(args.cmake_output, vtk_dir)
     print(f"Using VTK SDK: {vtk_dir}", flush=True)
     return 0
