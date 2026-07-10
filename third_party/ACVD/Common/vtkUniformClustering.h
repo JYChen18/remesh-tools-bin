@@ -392,7 +392,7 @@ void vtkUniformClustering<Metric,EdgeType>::ReComputeStatistics()
 	}
 
 	#pragma omp parallel for
-	for	(vtkIdType i=0;i!=this->NumberOfClusters;i++)
+	for	(vtkIdType i=0;i<this->NumberOfClusters;i++)
 	{
 
 		Cluster *Cluster = GetCluster( i );

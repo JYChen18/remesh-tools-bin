@@ -80,7 +80,7 @@ repair-wheel-command = "auditwheel repair --exclude 'libvtk*.so*' -w {dest_dir} 
 
 [tool.cibuildwheel.macos]
 environment = { MACOSX_DEPLOYMENT_TARGET = "12.0" }
-repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} --exclude libvtk -w {dest_dir} -v {wheel}"
+repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} --exclude libvtk --ignore-missing-dependencies -w {dest_dir} -v {wheel}"
 
 [tool.cibuildwheel.windows]
 repair-wheel-command = 'delvewheel repair --analyze-existing --analyze-existing-exes --exclude "vtk*.dll" -w {dest_dir} -v {wheel}'

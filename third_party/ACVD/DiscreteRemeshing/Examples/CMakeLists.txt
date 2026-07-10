@@ -26,6 +26,11 @@ foreach(loop_var ${DISCRETEREMESHING_EXAMPLES})
   add_executable(${loop_var} ${loop_var}.cxx)
   vtk_module_autoinit(TARGETS ${loop_var} MODULES "${VTK_LIBRARIES}")
   target_link_libraries(${loop_var} vtkSurface ${VTK_LIBRARIES} )
+  if(UNIX AND NOT APPLE AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU" AND OPENMP_FOUND)
+    # auditwheel must otherwise rewrite each executable to bundle libgomp.
+    # GCC 14 executables can be corrupted by that patchelf operation.
+    target_link_libraries(${loop_var} -Wl,-Bstatic gomp -Wl,-Bdynamic)
+  endif()
 endforeach(loop_var)
 
 install( TARGETS ${DISCRETEREMESHING_EXAMPLES}
