@@ -2,6 +2,15 @@ cmake_minimum_required(VERSION 3.28)
 
 project(remesh_tools_bin VERSION 0.1.0 LANGUAGES CXX)
 
+# Boost 1.81's Predef subproject declares CMake 3.0 policy compatibility.
+# CMake 4 removed compatibility older than 3.5 and requires callers to provide
+# this floor when adding such third-party projects without patching them.
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 4.0)
+  if(NOT DEFINED CMAKE_POLICY_VERSION_MINIMUM OR CMAKE_POLICY_VERSION_MINIMUM VERSION_LESS 3.5)
+    set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+  endif()
+endif()
+
 find_package(Python COMPONENTS Interpreter REQUIRED)
 
 set(REMESH_TOOLS_BIN_VTK_VERSION "9.5.2" CACHE STRING "VTK version used by remesh-tools-bin")
