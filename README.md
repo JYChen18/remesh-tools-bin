@@ -18,7 +18,7 @@ Source installs compile native dependencies and may take roughly 5-15 minutes de
 
 ### Requirements
 
-- CPython 3.8 through 3.13
+- CPython 3.10 through 3.13
 - A system C++ compiler/toolchain available to CMake. `uv` does not install
   GCC, Clang, MSVC, or Xcode Command Line Tools.
 
@@ -99,7 +99,7 @@ processing and Python runtime support.
 | OpenVDB | `v8.2.0` | Statically linked SDF remeshing implementation | [MPL 2.0](licenses/OpenVDB-MPL-2.0.txt) |
 | oneTBB | `v2022.0.0` | Bundled threading library | [Apache 2.0](licenses/oneTBB-Apache-2.0.txt) and [third-party notices](licenses/oneTBB-THIRD-PARTY-PROGRAMS.txt) |
 | Boost | `1.81.0`, or a compatible system version | OpenVDB build dependency | [Boost Software License 1.0](licenses/Boost-BSL-1.0.txt) |
-| VTK | `9.4.0` | External build and runtime dependency | BSD-style VTK license, supplied by the `vtk` distribution |
+| VTK | `9.5.2` | External build and runtime dependency | BSD-style VTK license, supplied by the `vtk` distribution |
 
 ## License
 

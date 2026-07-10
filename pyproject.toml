@@ -9,7 +9,7 @@ name = "remesh-tools-bin"
 version = "0.1.0"
 description = "Python package wrapper for native remeshing command line tools"
 readme = "README.md"
-requires-python = ">=3.8,<3.14"
+requires-python = ">=3.10,<3.14"
 license = "Apache-2.0"
 license-files = [
   "LICENSE",
@@ -20,7 +20,7 @@ authors = [
   { name = "remesh-tools-bin maintainers" },
 ]
 dependencies = [
-  "vtk==9.4.0",
+  "vtk==9.5.2",
 ]
 
 [project.urls]

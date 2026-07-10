@@ -4,7 +4,7 @@ project(remesh_tools_bin VERSION 0.1.0 LANGUAGES CXX)
 
 find_package(Python COMPONENTS Interpreter REQUIRED)
 
-set(REMESH_TOOLS_BIN_VTK_VERSION "9.4.0" CACHE STRING "VTK version used by remesh-tools-bin")
+set(REMESH_TOOLS_BIN_VTK_VERSION "9.5.2" CACHE STRING "VTK version used by remesh-tools-bin")
 set(REMESH_TOOLS_BIN_VTK_SDK_ROOT "${CMAKE_BINARY_DIR}/vtk-wheel-sdk" CACHE PATH "Extracted VTK wheel SDK root")
 set(REMESH_TOOLS_BIN_VTK_SDK_INFO "${CMAKE_BINARY_DIR}/remesh-tools-bin-vtk-sdk.cmake")
 

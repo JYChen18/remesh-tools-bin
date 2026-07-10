@@ -14,16 +14,22 @@ from pathlib import Path
 
 
 BASE_URL = "https://vtk.org/files/wheel-sdks"
-SUPPORTED_VERSION = "9.4.0"
+SUPPORTED_VERSION = "9.5.2"
+MINIMUM_PYTHON = (3, 10)
+MAXIMUM_PYTHON = (3, 13)
 
 
 def _cpython_tag() -> str:
     if platform.python_implementation() != "CPython":
-        raise RuntimeError("VTK 9.4.0 wheels are only available for CPython")
+        raise RuntimeError(f"VTK {SUPPORTED_VERSION} wheels are only available for CPython")
 
     major, minor = sys.version_info[:2]
-    if major != 3 or minor < 8 or minor > 13:
-        raise RuntimeError("VTK 9.4.0 SDK archives are available for CPython 3.8 through 3.13")
+    if (major, minor) < MINIMUM_PYTHON or (major, minor) > MAXIMUM_PYTHON:
+        raise RuntimeError(
+            f"VTK {SUPPORTED_VERSION} SDK archives are available for "
+            f"CPython {MINIMUM_PYTHON[0]}.{MINIMUM_PYTHON[1]} through "
+            f"{MAXIMUM_PYTHON[0]}.{MAXIMUM_PYTHON[1]}"
+        )
 
     return f"cp{major}{minor}"
 
@@ -33,7 +39,7 @@ def _platform_tag() -> str:
 
     if sys.platform.startswith("linux"):
         if machine in {"x86_64", "amd64"}:
-            return "manylinux_2_17_x86_64.manylinux2014_x86_64"
+            return "manylinux2014_x86_64.manylinux_2_17_x86_64"
     elif sys.platform == "darwin":
         if machine == "arm64":
             return "macosx_11_0_arm64"
@@ -43,7 +49,10 @@ def _platform_tag() -> str:
         if machine in {"amd64", "x86_64"}:
             return "win_amd64"
 
-    raise RuntimeError(f"VTK 9.4.0 SDK archive is not known for platform {sys.platform!r}/{machine!r}")
+    raise RuntimeError(
+        f"VTK {SUPPORTED_VERSION} SDK archive is not known for "
+        f"platform {sys.platform!r}/{machine!r}"
+    )
 
 
 def _sdk_archive_name(version: str) -> str:

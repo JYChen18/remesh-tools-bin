@@ -50,7 +50,7 @@ def _vtkmodules_dir() -> Path:
     try:
         import vtkmodules
     except ImportError as exc:
-        raise RuntimeError("remesh-tools-bin requires vtk==9.4.0 to be installed in this Python environment") from exc
+        raise RuntimeError("remesh-tools-bin requires vtk==9.5.2 to be installed in this Python environment") from exc
 
     if vtkmodules.__file__ is None:
         raise RuntimeError("Could not locate the installed vtkmodules package")
