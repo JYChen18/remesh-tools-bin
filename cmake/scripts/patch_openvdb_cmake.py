@@ -4,6 +4,43 @@ import argparse
 from pathlib import Path
 
 
+def _replace_exact(
+    path: Path,
+    old: str,
+    new: str,
+    *,
+    expected_count: int,
+) -> None:
+    text = path.read_text(encoding="utf-8")
+    old_count = text.count(old)
+
+    if old_count == expected_count:
+        path.write_text(text.replace(old, new), encoding="utf-8")
+        return
+    if old_count == 0 and text.count(new) == expected_count:
+        return
+
+    raise RuntimeError(
+        f"Expected {expected_count} occurrence(s) of {old!r} in {path}, "
+        f"found {old_count}"
+    )
+
+
+def patch_legacy_headers(openvdb_dir: Path) -> None:
+    _replace_exact(
+        openvdb_dir / "tree" / "NodeManager.h",
+        "OpT::template eval",
+        "OpT::eval",
+        expected_count=3,
+    )
+    _replace_exact(
+        openvdb_dir / "tools" / "PointIndexGrid.h",
+        "BaseLeaf::merge<Policy>(rhs);",
+        "BaseLeaf::template merge<Policy>(rhs);",
+        expected_count=1,
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("cmake_lists", type=Path)
@@ -34,10 +71,12 @@ def main() -> None:
         text = text.replace(boost_needle, boost_replacement)
     if replacement in text:
         path.write_text(text, encoding="utf-8")
-        return
-    if needle not in text:
-        raise RuntimeError(f"Could not find the OpenVDB TBB find_package line in {path}")
-    path.write_text(text.replace(needle, replacement), encoding="utf-8")
+    else:
+        if needle not in text:
+            raise RuntimeError(f"Could not find the OpenVDB TBB find_package line in {path}")
+        path.write_text(text.replace(needle, replacement), encoding="utf-8")
+
+    patch_legacy_headers(path.parent)
 
 
 if __name__ == "__main__":
