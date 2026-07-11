@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28)
 
-project(remesh_tools_bin VERSION 0.1.0 LANGUAGES CXX)
+project(remesh_tools_bin VERSION 0.1.1 LANGUAGES CXX)
 
 # Boost 1.81's Predef subproject declares CMake 3.0 policy compatibility.
 # CMake 4 removed compatibility older than 3.5 and requires callers to provide
