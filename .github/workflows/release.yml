@@ -59,6 +59,9 @@ jobs:
           - name: Linux x86_64
             os: ubuntu-latest
             artifact: linux-x86_64
+          - name: Linux ARM64
+            os: ubuntu-24.04-arm
+            artifact: linux-arm64
           - name: Windows x86_64
             os: windows-latest
             artifact: windows-x86_64
@@ -106,6 +109,9 @@ jobs:
           - name: Linux x86_64
             os: ubuntu-latest
             artifact: linux-x86_64
+          - name: Linux ARM64
+            os: ubuntu-24.04-arm
+            artifact: linux-arm64
           - name: Windows x86_64
             os: windows-latest
             artifact: windows-x86_64

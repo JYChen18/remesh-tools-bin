@@ -14,8 +14,8 @@ tool.
 uv add remesh-tools-bin
 ```
 
-Prebuilt wheels support CPython 3.10-3.13 on Linux x86_64, Windows x86_64,
-and macOS 12 or newer on Intel or Apple Silicon.
+Prebuilt wheels support CPython 3.10-3.13 on Linux x86_64 or ARM64, Windows
+x86_64, and macOS 12 or newer on Intel or Apple Silicon.
 
 ### Build from Source
 

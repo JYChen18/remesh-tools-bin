@@ -22,6 +22,12 @@ class VtkSdkArchiveTests(unittest.TestCase):
             "manylinux2014_x86_64.manylinux_2_17_x86_64.tar.xz",
         )
 
+    def test_linux_arm64_archive(self) -> None:
+        self.assertEqual(
+            self.archive_name("linux", "aarch64"),
+            "vtk-wheel-sdk-9.5.2-cp313-cp313-manylinux_2_28_aarch64.tar.xz",
+        )
+
     def test_macos_arm64_archive(self) -> None:
         self.assertEqual(
             self.archive_name("darwin", "arm64"),
@@ -37,7 +43,7 @@ class VtkSdkArchiveTests(unittest.TestCase):
     def test_unknown_platform_is_rejected(self) -> None:
         with (
             mock.patch.object(fetch_vtk_sdk.sys, "platform", "linux"),
-            mock.patch.object(fetch_vtk_sdk.platform, "machine", return_value="aarch64"),
+            mock.patch.object(fetch_vtk_sdk.platform, "machine", return_value="riscv64"),
             self.assertRaisesRegex(RuntimeError, "not known for platform"),
         ):
             fetch_vtk_sdk._platform_tag()
