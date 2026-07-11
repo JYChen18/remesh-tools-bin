@@ -40,6 +40,8 @@ def _platform_tag() -> str:
     if sys.platform.startswith("linux"):
         if machine in {"x86_64", "amd64"}:
             return "manylinux2014_x86_64.manylinux_2_17_x86_64"
+        if machine in {"aarch64", "arm64"}:
+            return "manylinux_2_28_aarch64"
     elif sys.platform == "darwin":
         if machine == "arm64":
             return "macosx_11_0_arm64"
