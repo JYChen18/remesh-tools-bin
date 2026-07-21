@@ -156,23 +156,24 @@ def run_volume_analysis(temporary_path: Path) -> None:
     fixture = write_volume_fixture(temporary_path)
     output_directory = temporary_path / "volume-output"
     output_directory.mkdir()
+    native_args = [
+        str(fixture),
+        "-n",
+        "0",
+        "-j",
+        "2",
+        "-f",
+        "ply",
+        "-o",
+        str(output_directory),
+    ]
     result = run_native(
         "VolumeAnalysis",
-        [
-            str(fixture),
-            "-n",
-            "0",
-            "-j",
-            "1",
-            "-f",
-            "ply",
-            "-o",
-            str(output_directory),
-        ],
+        native_args,
         cwd=temporary_path,
     )
     if result.returncode < 0:
-        diagnose_native_crash("VolumeAnalysis", [str(fixture)])
+        diagnose_native_crash("VolumeAnalysis", native_args)
     if result.returncode != 0:
         raise RuntimeError(f"VolumeAnalysis smoke test failed with exit code {result.returncode}")
     require_output(output_directory / "1.ply")
