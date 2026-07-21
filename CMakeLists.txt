@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28)
 
-project(remesh_tools_bin VERSION 0.1.1 LANGUAGES CXX)
+project(remesh_tools_bin VERSION 0.1.2 LANGUAGES CXX)
 
 # Boost 1.81's Predef subproject declares CMake 3.0 policy compatibility.
 # CMake 4 removed compatibility older than 3.5 and requires callers to provide
@@ -13,7 +13,7 @@ endif()
 
 find_package(Python COMPONENTS Interpreter REQUIRED)
 
-set(REMESH_TOOLS_BIN_VTK_VERSION "9.5.2" CACHE STRING "VTK version used by remesh-tools-bin")
+set(REMESH_TOOLS_BIN_VTK_VERSION "9.6.2" CACHE STRING "VTK version used by remesh-tools-bin")
 if(WIN32 AND DEFINED ENV{TEMP})
   string(MD5 REMESH_TOOLS_BIN_BUILD_ID "${CMAKE_BINARY_DIR}")
   file(TO_CMAKE_PATH "$ENV{TEMP}" REMESH_TOOLS_BIN_TEMP_DIR)
@@ -71,9 +71,8 @@ set(INSTALL_INCLUDE_DIR "${REMESH_TOOLS_BIN_NATIVE_DIR}/include" CACHE PATH "" F
 set(INSTALL_CMAKE_DIR "${REMESH_TOOLS_BIN_NATIVE_DIR}/lib/cmake/ACVD" CACHE PATH "" FORCE)
 set(INSTALL_DOC_DIR "${REMESH_TOOLS_BIN_NATIVE_DIR}/share/doc/ACVD" CACHE PATH "" FORCE)
 
-# VTK's manylinux2014 x86_64 wheel uses the old libstdc++ ABI, while its
-# manylinux_2_28 aarch64 wheel uses the default modern ABI.
-if(UNIX AND NOT APPLE AND CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|amd64|AMD64)$")
+# VTK's Linux wheels use the old libstdc++ ABI on every supported architecture.
+if(UNIX AND NOT APPLE)
   add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
 endif()
 

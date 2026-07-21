@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import unittest
+import zipfile
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest import mock
 
 from tools import fetch_vtk_sdk
 
 
-class VtkSdkArchiveTests(unittest.TestCase):
+class VtkSdkWheelTests(unittest.TestCase):
     def archive_name(self, sys_platform: str, machine: str) -> str:
         with (
             mock.patch.object(fetch_vtk_sdk.sys, "platform", sys_platform),
@@ -15,29 +18,28 @@ class VtkSdkArchiveTests(unittest.TestCase):
         ):
             return fetch_vtk_sdk._sdk_archive_name(fetch_vtk_sdk.SUPPORTED_VERSION)
 
-    def test_linux_x86_64_archive_uses_vtk_9_5_tag_order(self) -> None:
+    def test_linux_x86_64_wheel(self) -> None:
         self.assertEqual(
             self.archive_name("linux", "x86_64"),
-            "vtk-wheel-sdk-9.5.2-cp313-cp313-"
-            "manylinux2014_x86_64.manylinux_2_17_x86_64.tar.xz",
+            "vtk_sdk-9.6.2-cp313-cp313-linux_x86_64.whl",
         )
 
-    def test_linux_arm64_archive(self) -> None:
+    def test_linux_arm64_wheel(self) -> None:
         self.assertEqual(
             self.archive_name("linux", "aarch64"),
-            "vtk-wheel-sdk-9.5.2-cp313-cp313-manylinux_2_28_aarch64.tar.xz",
+            "vtk_sdk-9.6.2-cp313-cp313-linux_aarch64.whl",
         )
 
-    def test_macos_arm64_archive(self) -> None:
+    def test_macos_arm64_wheel(self) -> None:
         self.assertEqual(
             self.archive_name("darwin", "arm64"),
-            "vtk-wheel-sdk-9.5.2-cp313-cp313-macosx_11_0_arm64.tar.xz",
+            "vtk_sdk-9.6.2-cp313-cp313-macosx_11_0_arm64.whl",
         )
 
-    def test_windows_x86_64_archive(self) -> None:
+    def test_windows_x86_64_wheel(self) -> None:
         self.assertEqual(
             self.archive_name("win32", "AMD64"),
-            "vtk-wheel-sdk-9.5.2-cp313-cp313-win_amd64.tar.xz",
+            "vtk_sdk-9.6.2-cp313-cp313-win_amd64.whl",
         )
 
     def test_unknown_platform_is_rejected(self) -> None:
@@ -54,6 +56,18 @@ class VtkSdkArchiveTests(unittest.TestCase):
             self.assertRaisesRegex(RuntimeError, "3.10 through 3.13"),
         ):
             fetch_vtk_sdk._cpython_tag()
+
+    def test_wheel_extraction_rejects_parent_paths(self) -> None:
+        with TemporaryDirectory() as temporary_directory:
+            root = Path(temporary_directory)
+            wheel = root / "sdk.whl"
+            with zipfile.ZipFile(wheel, "w") as archive:
+                archive.writestr("../outside", "bad")
+
+            with self.assertRaisesRegex(RuntimeError, "outside destination"):
+                fetch_vtk_sdk._safe_extract(wheel, root / "sdk")
+
+            self.assertFalse((root / "outside").exists())
 
 
 if __name__ == "__main__":
