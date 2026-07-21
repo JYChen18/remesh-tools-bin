@@ -133,7 +133,7 @@ jobs:
 
       - name: Install wheel
         shell: bash
-        run: python -m pip install --only-binary=:all: wheelhouse/*.whl
+        run: "python -m pip install --only-binary=:all: wheelhouse/*.whl"
 
       - name: Verify installed dependencies
         run: python -m pip check
@@ -174,7 +174,7 @@ jobs:
 
       - name: Install wheel without system packages
         shell: bash
-        run: python -m pip install --only-binary=:all: wheelhouse/*.whl
+        run: "python -m pip install --only-binary=:all: wheelhouse/*.whl"
 
       - name: Verify installed dependencies
         run: python -m pip check
