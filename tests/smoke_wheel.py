@@ -161,7 +161,7 @@ def run_volume_analysis(temporary_path: Path) -> None:
         "-n",
         "0",
         "-j",
-        "2",
+        "1",
         "-f",
         "ply",
         "-o",
