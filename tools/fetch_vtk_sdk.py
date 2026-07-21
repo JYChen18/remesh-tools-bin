@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch and expose the official VTK wheel SDK archive for remesh-tools-bin builds."""
+"""Fetch and expose the official VTK wheel SDK for remesh-tools-bin builds."""
 
 from __future__ import annotations
 
@@ -7,14 +7,14 @@ import argparse
 import os
 import platform
 import sys
-import tarfile
 import urllib.error
 import urllib.request
+import zipfile
 from pathlib import Path
 
 
-BASE_URL = "https://vtk.org/files/wheel-sdks"
-SUPPORTED_VERSION = "9.5.2"
+BASE_URL = "https://vtk.org/files/wheel-sdks/vtk-sdk"
+SUPPORTED_VERSION = "9.6.2"
 MINIMUM_PYTHON = (3, 10)
 MAXIMUM_PYTHON = (3, 13)
 
@@ -39,9 +39,9 @@ def _platform_tag() -> str:
 
     if sys.platform.startswith("linux"):
         if machine in {"x86_64", "amd64"}:
-            return "manylinux2014_x86_64.manylinux_2_17_x86_64"
+            return "linux_x86_64"
         if machine in {"aarch64", "arm64"}:
-            return "manylinux_2_28_aarch64"
+            return "linux_aarch64"
     elif sys.platform == "darwin":
         if machine == "arm64":
             return "macosx_11_0_arm64"
@@ -59,15 +59,18 @@ def _platform_tag() -> str:
 
 def _sdk_archive_name(version: str) -> str:
     py_tag = _cpython_tag()
-    return f"vtk-wheel-sdk-{version}-{py_tag}-{py_tag}-{_platform_tag()}.tar.xz"
+    return f"vtk_sdk-{version}-{py_tag}-{py_tag}-{_platform_tag()}.whl"
 
 
 def _download(url: str, archive: Path) -> None:
     archive.parent.mkdir(parents=True, exist_ok=True)
     if archive.exists():
-        return
+        if zipfile.is_zipfile(archive):
+            return
+        archive.unlink()
 
     tmp = archive.with_name(f"{archive.name}.{os.getpid()}.part")
+    tmp.unlink(missing_ok=True)
     print(f"Downloading {url}", flush=True)
     request = urllib.request.Request(url, headers={"User-Agent": "remesh-tools-bin-build"})
     try:
@@ -80,6 +83,9 @@ def _download(url: str, archive: Path) -> None:
     except urllib.error.HTTPError as exc:
         raise RuntimeError(f"VTK SDK archive does not exist at {url}") from exc
 
+    if not zipfile.is_zipfile(tmp):
+        tmp.unlink(missing_ok=True)
+        raise RuntimeError(f"Downloaded VTK SDK is not a valid wheel: {url}")
     tmp.replace(archive)
 
 
@@ -87,13 +93,18 @@ def _safe_extract(archive: Path, dest: Path) -> None:
     dest.mkdir(parents=True, exist_ok=True)
     resolved_dest = dest.resolve()
 
-    with tarfile.open(archive, "r:xz") as tar:
-        members = tar.getmembers()
+    with zipfile.ZipFile(archive) as wheel:
+        members = wheel.infolist()
         for member in members:
-            target = (dest / member.name).resolve()
+            target = (dest / member.filename).resolve()
             if target != resolved_dest and resolved_dest not in target.parents:
-                raise RuntimeError(f"Refusing to extract path outside destination: {member.name}")
-        tar.extractall(dest, members=members)
+                raise RuntimeError(f"Refusing to extract path outside destination: {member.filename}")
+
+        for member in members:
+            target = Path(wheel.extract(member, dest))
+            mode = (member.external_attr >> 16) & 0o777
+            if mode and target.is_file():
+                target.chmod(mode)
 
 
 def _find_vtk_dir(root: Path) -> Path:
@@ -134,14 +145,13 @@ def main() -> int:
 
     archive_name = _sdk_archive_name(args.version)
     archive = args.dest / "downloads" / archive_name
-    extract_root = args.dest / "extracted"
-    sdk_root = extract_root / archive_name.removesuffix(".tar.xz")
+    sdk_root = args.dest / "sdk" / archive_name.removesuffix(".whl")
     stamp = sdk_root / ".remesh-tools-bin-extracted"
 
     _download(f"{BASE_URL}/{archive_name}", archive)
     if not stamp.exists():
-        _safe_extract(archive, extract_root)
-        stamp.write_text("ok\n", encoding="utf-8")
+        _safe_extract(archive, sdk_root)
+        stamp.write_text(f"{archive_name}\n", encoding="utf-8")
 
     vtk_dir = _find_vtk_dir(sdk_root)
     _write_cmake_output(args.cmake_output, vtk_dir)

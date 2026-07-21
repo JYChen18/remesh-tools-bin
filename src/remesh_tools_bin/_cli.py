@@ -56,7 +56,7 @@ def _vtkmodules_dir() -> Path:
     try:
         import vtkmodules
     except ImportError as exc:
-        raise RuntimeError("remesh-tools-bin requires vtk==9.5.2 to be installed in this Python environment") from exc
+        raise RuntimeError("remesh-tools-bin requires vtk==9.6.2 to be installed in this Python environment") from exc
 
     if vtkmodules.__file__ is None:
         raise RuntimeError("Could not locate the installed vtkmodules package")
@@ -119,9 +119,10 @@ def run_native(
     args: Iterable[str] | None = None,
     *,
     check: bool = False,
+    cwd: str | os.PathLike[str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     argv = [str(_tool_path(tool)), *(args or ())]
-    return subprocess.run(argv, env=_native_env(), check=check, text=True)
+    return subprocess.run(argv, env=_native_env(), check=check, cwd=cwd, text=True)
 
 
 def _run_native(tool: str, args: Sequence[str]) -> int:

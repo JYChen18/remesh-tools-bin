@@ -127,23 +127,7 @@ VTK_THREAD_RETURN_TYPE ThreadedSurfaceExtraction (void *arg)
 	vtkImageData *Image = vtkImageData::New();
 	Image->ShallowCopy(Helper->Image);
 
-	// create the polydataWriter in correct format
-	vtkPolyDataWriter *Writer = 0;
 	char *Format=Helper->GetOutputFormat();
-	char extension[4];
-	strcpy (extension,"vtk");
-	if (strstr(Format,extension) != NULL) {
-		Writer=vtkPolyDataWriter::New();
-	} else {
-		strcpy (extension, "ply");
-		if (strstr(Format,extension) != NULL) {
-			Writer = (vtkPolyDataWriter*) vtkPLYWriter::New();
-		} else {
-			strcpy (extension, "stl");
-			if (strstr(Format, extension) != NULL)
-				Writer = (vtkPolyDataWriter*) vtkSTLWriter::New();		
-		}
-	}
 
 	vtkDiscreteMarchingCubes *Contour = vtkDiscreteMarchingCubes::New();
 	Contour->ComputeNormalsOff();
@@ -326,9 +310,25 @@ VTK_THREAD_RETURN_TYPE ThreadedSurfaceExtraction (void *arg)
 			Helper->Lock->unlock();
 		}
 
-		Writer->SetInputData(Mesh);
-		Writer->SetFileName(Name.str().c_str());
-		Writer->Write();
+		if (strstr(Format, "vtk") != NULL) {
+			vtkPolyDataWriter *Writer = vtkPolyDataWriter::New();
+			Writer->SetInputData(Mesh);
+			Writer->SetFileName(Name.str().c_str());
+			Writer->Write();
+			Writer->Delete();
+		} else if (strstr(Format, "ply") != NULL) {
+			vtkPLYWriter *Writer = vtkPLYWriter::New();
+			Writer->SetInputData(Mesh);
+			Writer->SetFileName(Name.str().c_str());
+			Writer->Write();
+			Writer->Delete();
+		} else if (strstr(Format, "stl") != NULL) {
+			vtkSTLWriter *Writer = vtkSTLWriter::New();
+			Writer->SetInputData(Mesh);
+			Writer->SetFileName(Name.str().c_str());
+			Writer->Write();
+			Writer->Delete();
+		}
 		Timer->StopTimer();
 		
 		Helper->Lock->lock();
@@ -347,7 +347,6 @@ VTK_THREAD_RETURN_TYPE ThreadedSurfaceExtraction (void *arg)
 
 	Helper->Lock->lock();
 	Contour->Delete();
-	Writer->Delete();
 	Image->Delete();
 	Timer->Delete();
 	cout<< "Thread " << MyId << " done"<<endl;
