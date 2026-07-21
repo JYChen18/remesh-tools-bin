@@ -145,7 +145,7 @@ def main() -> int:
 
     archive_name = _sdk_archive_name(args.version)
     archive = args.dest / "downloads" / archive_name
-    sdk_root = args.dest / "sdk"
+    sdk_root = args.dest / "sdk" / archive_name.removesuffix(".whl")
     stamp = sdk_root / ".remesh-tools-bin-extracted"
 
     _download(f"{BASE_URL}/{archive_name}", archive)
