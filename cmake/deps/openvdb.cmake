@@ -4,9 +4,9 @@ endif()
 
 include(FetchContent)
 
-set(REMESH_TOOLS_BIN_OPENVDB_VERSION "v8.2.0" CACHE STRING "OpenVDB version used by remesh-tools-bin")
-set(REMESH_TOOLS_BIN_TBB_VERSION "v2022.0.0" CACHE STRING "oneTBB version used by remesh-tools-bin")
-set(REMESH_TOOLS_BIN_BOOST_VERSION "1.81.0" CACHE STRING "Boost version used by remesh-tools-bin")
+set(REMESH_TOOLS_BIN_OPENVDB_VERSION "v8.2.0" CACHE STRING "OpenVDB version used by sim-asset-tools")
+set(REMESH_TOOLS_BIN_TBB_VERSION "v2022.0.0" CACHE STRING "oneTBB version used by sim-asset-tools")
+set(REMESH_TOOLS_BIN_BOOST_VERSION "1.81.0" CACHE STRING "Boost version used by sim-asset-tools")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "" FORCE)
 

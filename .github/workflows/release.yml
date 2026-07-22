@@ -94,6 +94,28 @@ jobs:
           path: wheelhouse/*.whl
           if-no-files-found: error
 
+  test-python:
+    name: Test Python asset APIs
+    needs: verify-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: "3.13"
+
+      - name: Install Python test dependencies
+        run: python -m pip install pytest "mujoco>=3.3" "numpy>=1.26" "trimesh>=4.0"
+
+      - name: Run Python unit tests
+        env:
+          PYTHONPATH: src
+        run: python -m pytest -q tests
+
   test-wheels:
     name: Test ${{ matrix.target.name }} on Python ${{ matrix.python-version }}
     needs: build-wheels
@@ -187,12 +209,13 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs:
       - build-wheels
+      - test-python
       - test-wheels
       - test-linux-minimal
     runs-on: ubuntu-latest
     environment:
       name: pypi
-      url: https://pypi.org/p/remesh-tools-bin
+      url: https://pypi.org/p/sim-asset-tools
     permissions:
       id-token: write # Required for PyPI Trusted Publishing via OpenID Connect.
 

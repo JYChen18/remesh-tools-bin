@@ -1,4 +1,4 @@
-"""Python launchers for packaged native remeshing tools."""
+"""Compatibility namespace; new code should import :mod:`sim_asset_tools`."""
 
 from __future__ import annotations
 

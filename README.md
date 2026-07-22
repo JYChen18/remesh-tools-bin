@@ -1,110 +1,118 @@
-# remesh-tools-bin
+# sim-asset-tools
 
-`remesh-tools-bin` is a Python packaging wrapper for native remeshing command
-line tools. It currently packages the official
-[valette/ACVD](https://github.com/valette/ACVD) remeshing tools and a small
-[OpenVDB](https://github.com/AcademySoftwareFoundation/openvdb) SDF remeshing
-tool.
+`sim-asset-tools` prepares portable, versioned assets for robotics and physics
+simulation. It combines packaged OpenVDB and ACVD executables, peer raw-mesh
+operations such as normalization and CoACD decomposition, and higher-level
+object and body-surface workflows behind one `sim-assets` command.
 
 ## Installation
 
-### Install from PyPI
+Install all object and model operations as an isolated tool:
 
 ```bash
-uv add remesh-tools-bin
+uv tool install "sim-asset-tools[all]"
 ```
 
-Prebuilt wheels support CPython 3.10-3.13 on Linux x86_64 or ARM64, Windows
-x86_64, and macOS 12 or newer on Intel or Apple Silicon.
+The default installation includes native remeshing, normalization, validation,
+and their VTK/Trimesh runtimes. Install `sim-asset-tools[coacd]` for object
+preparation or `sim-asset-tools[mujoco]` for compiled-model body surfaces.
 
-Headless remeshing requires no additional OS packages beyond the platform's
-baseline runtime libraries. The optional ACVD `--display` modes still require
-a working system display and graphics stack.
+Prebuilt wheels support CPython 3.10–3.13 on Linux x86_64 or ARM64, Windows
+x86_64, and macOS 12 or newer on Intel or Apple Silicon. Headless processing
+does not require additional OS packages beyond the platform baseline.
 
-### Build from Source
+To build from source:
 
 ```bash
-git clone https://github.com/JYChen18/remesh-tools-bin.git
-cd remesh-tools-bin
-uv sync
+git clone https://github.com/JYChen18/sim-asset-tools.git
+cd sim-asset-tools
+uv sync --all-extras
 uv build --wheel
 ```
 
-The wheel is written to `dist/`.
-
-## Usage
-
-### ACVD Remeshing
-
-ACVD methods remesh a surface to a target vertex count. `--gradation 0`
-requests uniform remeshing; higher values give more influence to local
-curvature. A gradation of `1.5` with manifold output is a good default:
+## Mesh operations
 
 ```bash
-uv run remesh acvd input.obj output.ply --vertices 3000 --gradation 1.5 --force-manifold 1
+sim-assets mesh normalize input.obj normalized.obj
+
+sim-assets mesh openvdb input.obj output.obj \
+  --resolution 50 --level-set 0.1
+
+sim-assets mesh acvd input.obj output.ply \
+  --vertices 3000 --gradation 1.5
+
+sim-assets mesh coacd input.obj collision/
 ```
 
-Available ACVD methods:
-
-- `acvd`
-- `acvd-parallel`
-- `acvd-quadric`
-- `acvd-quadric-parallel`
-- `acvd-anisotropic`
-- `acvd-anisotropic-quadric`
-- `acvd-anisotropic-quadric-parallel`
-
-Common options include `--vertices`, `--gradation`, `--subsample`,
-`--split-long-edges`, and `--display`. Parallel methods also accept
-`--threads`.
-
-### OpenVDB SDF Remeshing
-
-The OpenVDB method reads OBJ meshes and writes OBJ meshes by converting the
-input surface to a signed distance field and extracting a new surface:
+The old command remains available for the `0.2.x` transition:
 
 ```bash
-uv run remesh openvdb-sdf input.obj output.obj --resolution 50 --level-set 0.1
+remesh acvd input.obj output.ply --vertices 3000 --gradation 1.5
 ```
 
-By default it normalizes the input mesh before applying the OpenVDB conversion
-and then recovers the original scale, matching the way CoACD uses this
-preprocessing step. Use `--no-normalize` to apply OpenVDB directly in input
-coordinates.
+## Object bundles
 
-## Acknowledgements
+Prepare one object or every supported mesh in a folder:
 
-The ACVD tools are provided by the vendored
-[valette/ACVD](https://github.com/valette/ACVD) source at commit
-`275554980e466914ae9053c8667006f251989422`. ACVD credits CNRS, INSA-Lyon,
-UCBL, and INSERM, and derives from the following work:
+```bash
+sim-assets prepare object raw/cup.obj \
+  --output assets/objects/cup --formats mjcf,urdf
+sim-assets prepare objects raw/ --output assets/objects --jobs 8
+sim-assets check object assets/objects/cup
+```
 
-- S. Valette, J.-M. Chassery, and R. Prost, "Generic remeshing of 3D
-  triangular meshes with metric-dependent discrete Voronoi Diagrams," IEEE
-  TVCG 14(2), 369-381, 2008.
-- S. Valette and J.-M. Chassery, "Approximated Centroidal Voronoi Diagrams for
-  Uniform Polygonal Mesh Coarsening," Computer Graphics Forum 23(3), 381-389,
-  2004.
-- M. Audette et al., "Approach-guided controlled resolution brain meshing for
-  FE-based interactive neurosurgery simulation," MICCAI Mesh Processing in
-  Medical Image Analysis Workshop, 2011.
+Each object is self-describing:
 
-The package also uses OpenVDB for signed-distance-field processing, oneTBB for
-threading, Boost components required by OpenVDB, and VTK for native mesh
-processing and Python runtime support.
+```text
+cup/
+├── asset.json
+├── source/
+├── visual/mesh.obj
+├── collision/coacd/part_000.obj
+└── models/
+    ├── model.xml
+    └── model.urdf
+```
 
-## Third-Party Software
+The pipeline normalizes the source mesh, runs OpenVDB and ACVD, decomposes the
+result with CoACD, and records the transform, recipes, hashes, and collision
+mass properties in `asset.json`.
+
+## Body surfaces
+
+Prepare body-local, watertight surfaces from the final compiled model so that
+entity prefixes, scaling, and attached collision geoms are included:
+
+```bash
+sim-assets prepare body-surfaces scene.xml \
+  --output assets/derived/scene/body-surfaces
+
+sim-assets check body-surfaces scene.xml \
+  --assets assets/derived/scene/body-surfaces
+```
+
+The `body-surfaces/v1` manifest maps exact model body names to hashed filenames,
+which supports names containing separators such as `hand/forearm`. Consumers
+validate the source and generated mesh hashes before using the surfaces.
+
+## Manifest compatibility
+
+All generated bundles use schema `sim-asset/v1`. Body-surface guarantees are
+versioned separately as `body-surfaces/v1`. Artifact paths are relative to the
+manifest, and the manifest is published only after all referenced files are
+complete.
+
+## Third-party software
 
 | Component | Version or source | Use | License |
 | --- | --- | --- | --- |
-| ACVD | Commit `275554980e466914ae9053c8667006f251989422` | Bundled native remeshing tools | [CeCILL-B](third_party/ACVD/LICENSE.txt) |
-| OpenVDB | `v8.2.0` | Statically linked SDF remeshing implementation | [MPL 2.0](licenses/OpenVDB-MPL-2.0.txt) |
-| oneTBB | `v2022.0.0` | Bundled threading library | [Apache 2.0](licenses/oneTBB-Apache-2.0.txt) and [third-party notices](licenses/oneTBB-THIRD-PARTY-PROGRAMS.txt) |
-| Boost | `1.81.0`, or a compatible system version | OpenVDB build dependency | [Boost Software License 1.0](licenses/Boost-BSL-1.0.txt) |
-| VTK | `9.6.2` | External build and runtime dependency | BSD-style VTK license, supplied by the `vtk` distribution |
-
-## License
+| ACVD | Commit `275554980e466914ae9053c8667006f251989422` | Bundled remeshing tools | [CeCILL-B](third_party/ACVD/LICENSE.txt) |
+| OpenVDB | `v8.2.0` | Statically linked SDF processing | [MPL 2.0](licenses/OpenVDB-MPL-2.0.txt) |
+| oneTBB | `v2022.0.0` | Bundled threading library | [Apache 2.0](licenses/oneTBB-Apache-2.0.txt) |
+| Boost | `1.81.0` | OpenVDB build dependency | [Boost Software License 1.0](licenses/Boost-BSL-1.0.txt) |
+| VTK | `9.6.2` | Native mesh processing runtime | BSD-style VTK license |
+| CoACD | Optional Python dependency | Convex decomposition | See the installed CoACD distribution |
 
 Code authored for this repository is licensed under the
-[Apache License 2.0](LICENSE). Bundled third-party components remain under
-their respective licenses listed above.
+[Apache License 2.0](LICENSE). Bundled third-party components retain their
+respective licenses.

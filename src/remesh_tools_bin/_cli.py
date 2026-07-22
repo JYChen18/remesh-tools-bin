@@ -38,25 +38,42 @@ _ANISOTROPIC_OUTPUTS = {
 }
 
 
+def _native_root() -> Path:
+    source_candidate = Path(__file__).resolve().parent.parent / "sim_asset_tools" / "_native"
+    if source_candidate.is_dir():
+        return source_candidate
+    for entry in sys.path:
+        candidate = Path(entry or ".").resolve() / "sim_asset_tools" / "_native"
+        if candidate.is_dir():
+            return candidate
+    return source_candidate
+
+
 def native_bin_dir() -> Path:
-    return Path(__file__).resolve().parent / "_native" / "bin"
+    return _native_root() / "bin"
 
 
 def _native_lib_dir() -> Path:
-    return Path(__file__).resolve().parent / "_native" / "lib"
+    return _native_root() / "lib"
 
 
 def _vendored_library_dirs() -> tuple[Path, ...]:
     package_dir = Path(__file__).resolve().parent
-    candidate = package_dir.parent / "remesh_tools_bin.libs"
-    return (candidate,) if candidate.is_dir() else ()
+    candidates = [
+        package_dir.parent / "sim_asset_tools.libs",
+        package_dir.parent / "remesh_tools_bin.libs",
+    ]
+    for entry in sys.path:
+        root = Path(entry or ".").resolve()
+        candidates.extend((root / "sim_asset_tools.libs", root / "remesh_tools_bin.libs"))
+    return tuple(dict.fromkeys(candidate for candidate in candidates if candidate.is_dir()))
 
 
 def _vtkmodules_dir() -> Path:
     try:
         import vtkmodules
     except ImportError as exc:
-        raise RuntimeError("remesh-tools-bin requires vtk==9.6.2 to be installed in this Python environment") from exc
+        raise RuntimeError("sim-asset-tools requires vtk==9.6.2 to run native remeshing tools") from exc
 
     if vtkmodules.__file__ is None:
         raise RuntimeError("Could not locate the installed vtkmodules package")

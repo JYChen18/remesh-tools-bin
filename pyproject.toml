@@ -5,9 +5,9 @@ requires = [
 build-backend = "scikit_build_core.build"
 
 [project]
-name = "remesh-tools-bin"
-version = "0.1.2"
-description = "Python package wrapper for native remeshing command line tools"
+name = "sim-asset-tools"
+version = "0.2.0"
+description = "Portable tools for preparing simulation-ready mesh and model assets"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
 license = "Apache-2.0"
@@ -17,24 +17,45 @@ license-files = [
   "third_party/ACVD/LICENSE.txt",
 ]
 authors = [
-  { name = "remesh-tools-bin maintainers" },
+  { name = "sim-asset-tools maintainers" },
 ]
 dependencies = [
+  "numpy>=1.26",
+  "trimesh>=4.0",
   "vtk==9.6.2",
 ]
 
 [project.urls]
 ACVD = "https://github.com/valette/ACVD"
 OpenVDB = "https://github.com/AcademySoftwareFoundation/openvdb"
-Repository = "https://github.com/JYChen18/remesh-tools-bin"
+Repository = "https://github.com/JYChen18/sim-asset-tools"
 
 [project.scripts]
-remesh = "remesh_tools_bin._cli:main"
+sim-assets = "sim_asset_tools.cli:main"
+remesh = "sim_asset_tools.legacy:main"
+
+[project.optional-dependencies]
+coacd = [
+  "coacd>=1.0.11",
+]
+mujoco = [
+  "mujoco>=3.3",
+]
+all = [
+  "coacd>=1.0.11",
+  "mujoco>=3.3",
+]
+
+[dependency-groups]
+dev = [
+  "pytest>=8",
+  "ruff>=0.12",
+]
 
 [tool.scikit-build]
 minimum-version = "build-system.requires"
 build-dir = "build/{wheel_tag}"
-wheel.packages = ["src/remesh_tools_bin"]
+wheel.packages = ["src/remesh_tools_bin", "src/sim_asset_tools"]
 wheel.py-api = "py3"
 sdist.inclusion-mode = "explicit"
 sdist.include = [
@@ -46,6 +67,7 @@ sdist.include = [
   "/licenses/**",
   "/native/**",
   "/src/remesh_tools_bin/**",
+  "/src/sim_asset_tools/**",
   "/third_party/ACVD/**",
   "/tools/**",
 ]

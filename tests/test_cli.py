@@ -29,8 +29,12 @@ class NativeEnvironmentTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary_directory:
             site_packages = Path(temporary_directory)
             package_dir = site_packages / "remesh_tools_bin"
+            native_package_dir = site_packages / "sim_asset_tools"
             vendored_dir = site_packages / "remesh_tools_bin.libs"
             package_dir.mkdir()
+            native_package_dir.mkdir()
+            (native_package_dir / "_native" / "bin").mkdir(parents=True)
+            (native_package_dir / "_native" / "lib").mkdir()
             vendored_dir.mkdir()
 
             fake_cli = package_dir / "_cli.py"
@@ -50,8 +54,8 @@ class NativeEnvironmentTests(unittest.TestCase):
             self.assertEqual(
                 paths[:3],
                 [
-                    str(package_dir / "_native" / "bin"),
-                    str(package_dir / "_native" / "lib"),
+                    str(native_package_dir / "_native" / "bin"),
+                    str(native_package_dir / "_native" / "lib"),
                     str(vendored_dir),
                 ],
             )

@@ -8,6 +8,7 @@ import tempfile
 from pathlib import Path
 
 from remesh_tools_bin._cli import _native_env, _tool_path, main, run_native
+from sim_asset_tools.cli import main as sim_assets_main
 
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "tetrahedron.obj"
@@ -175,7 +176,9 @@ def run_volume_analysis(temporary_path: Path) -> None:
     if result.returncode < 0:
         diagnose_native_crash("VolumeAnalysis", native_args)
     if result.returncode != 0:
-        raise RuntimeError(f"VolumeAnalysis smoke test failed with exit code {result.returncode}")
+        raise RuntimeError(
+            f"VolumeAnalysis smoke test failed with exit code {result.returncode}"
+        )
     require_output(output_directory / "1.ply")
     require_output(temporary_path / "meshes.xml")
 
@@ -196,8 +199,26 @@ def run() -> None:
             ]
         )
         if openvdb_result != 0:
-            raise RuntimeError(f"OpenVDB smoke test failed with exit code {openvdb_result}")
+            raise RuntimeError(
+                f"OpenVDB smoke test failed with exit code {openvdb_result}"
+            )
         require_output(openvdb_output)
+        structured_output = temporary_path / "sim-assets-openvdb.obj"
+        structured_result = sim_assets_main(
+            [
+                "mesh",
+                "openvdb",
+                str(FIXTURE),
+                str(structured_output),
+                "--resolution",
+                "10",
+            ]
+        )
+        if structured_result != 0:
+            raise RuntimeError(
+                f"sim-assets smoke test failed with exit code {structured_result}"
+            )
+        require_output(structured_output)
         run_acvd_cases(temporary_path)
         run_volume_analysis(temporary_path)
 

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.28)
 
-project(remesh_tools_bin VERSION 0.1.2 LANGUAGES CXX)
+project(sim_asset_tools VERSION 0.2.0 LANGUAGES CXX)
 
 # Boost 1.81's Predef subproject declares CMake 3.0 policy compatibility.
 # CMake 4 removed compatibility older than 3.5 and requires callers to provide
@@ -13,7 +13,7 @@ endif()
 
 find_package(Python COMPONENTS Interpreter REQUIRED)
 
-set(REMESH_TOOLS_BIN_VTK_VERSION "9.6.2" CACHE STRING "VTK version used by remesh-tools-bin")
+set(REMESH_TOOLS_BIN_VTK_VERSION "9.6.2" CACHE STRING "VTK version used by sim-asset-tools")
 if(WIN32 AND DEFINED ENV{TEMP})
   string(MD5 REMESH_TOOLS_BIN_BUILD_ID "${CMAKE_BINARY_DIR}")
   file(TO_CMAKE_PATH "$ENV{TEMP}" REMESH_TOOLS_BIN_TEMP_DIR)
@@ -63,13 +63,13 @@ if(NOT DEFINED SKBUILD_PLATLIB_DIR)
   set(SKBUILD_PLATLIB_DIR "${CMAKE_INSTALL_PREFIX}")
 endif()
 
-set(REMESH_TOOLS_BIN_NATIVE_DIR "${SKBUILD_PLATLIB_DIR}/remesh_tools_bin/_native")
+set(SIM_ASSET_TOOLS_NATIVE_DIR "${SKBUILD_PLATLIB_DIR}/sim_asset_tools/_native")
 
-set(INSTALL_BIN_DIR "${REMESH_TOOLS_BIN_NATIVE_DIR}/bin" CACHE PATH "" FORCE)
-set(INSTALL_LIB_DIR "${REMESH_TOOLS_BIN_NATIVE_DIR}/lib" CACHE PATH "" FORCE)
-set(INSTALL_INCLUDE_DIR "${REMESH_TOOLS_BIN_NATIVE_DIR}/include" CACHE PATH "" FORCE)
-set(INSTALL_CMAKE_DIR "${REMESH_TOOLS_BIN_NATIVE_DIR}/lib/cmake/ACVD" CACHE PATH "" FORCE)
-set(INSTALL_DOC_DIR "${REMESH_TOOLS_BIN_NATIVE_DIR}/share/doc/ACVD" CACHE PATH "" FORCE)
+set(INSTALL_BIN_DIR "${SIM_ASSET_TOOLS_NATIVE_DIR}/bin" CACHE PATH "" FORCE)
+set(INSTALL_LIB_DIR "${SIM_ASSET_TOOLS_NATIVE_DIR}/lib" CACHE PATH "" FORCE)
+set(INSTALL_INCLUDE_DIR "${SIM_ASSET_TOOLS_NATIVE_DIR}/include" CACHE PATH "" FORCE)
+set(INSTALL_CMAKE_DIR "${SIM_ASSET_TOOLS_NATIVE_DIR}/lib/cmake/ACVD" CACHE PATH "" FORCE)
+set(INSTALL_DOC_DIR "${SIM_ASSET_TOOLS_NATIVE_DIR}/share/doc/ACVD" CACHE PATH "" FORCE)
 
 # VTK's Linux x86_64 wheel uses the old libstdc++ ABI, while its aarch64
 # wheel uses the default modern ABI.

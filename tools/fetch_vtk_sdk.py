@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Fetch and expose the official VTK wheel SDK for remesh-tools-bin builds."""
+"""Fetch and expose the official VTK wheel SDK for sim-asset-tools builds."""
 
 from __future__ import annotations
 
@@ -21,7 +21,9 @@ MAXIMUM_PYTHON = (3, 13)
 
 def _cpython_tag() -> str:
     if platform.python_implementation() != "CPython":
-        raise RuntimeError(f"VTK {SUPPORTED_VERSION} wheels are only available for CPython")
+        raise RuntimeError(
+            f"VTK {SUPPORTED_VERSION} wheels are only available for CPython"
+        )
 
     major, minor = sys.version_info[:2]
     if (major, minor) < MINIMUM_PYTHON or (major, minor) > MAXIMUM_PYTHON:
@@ -72,9 +74,14 @@ def _download(url: str, archive: Path) -> None:
     tmp = archive.with_name(f"{archive.name}.{os.getpid()}.part")
     tmp.unlink(missing_ok=True)
     print(f"Downloading {url}", flush=True)
-    request = urllib.request.Request(url, headers={"User-Agent": "remesh-tools-bin-build"})
+    request = urllib.request.Request(
+        url, headers={"User-Agent": "sim-asset-tools-build"}
+    )
     try:
-        with urllib.request.urlopen(request, timeout=120) as response, tmp.open("xb") as handle:
+        with (
+            urllib.request.urlopen(request, timeout=120) as response,
+            tmp.open("xb") as handle,
+        ):
             while True:
                 chunk = response.read(1024 * 1024)
                 if not chunk:
@@ -98,7 +105,9 @@ def _safe_extract(archive: Path, dest: Path) -> None:
         for member in members:
             target = (dest / member.filename).resolve()
             if target != resolved_dest and resolved_dest not in target.parents:
-                raise RuntimeError(f"Refusing to extract path outside destination: {member.filename}")
+                raise RuntimeError(
+                    f"Refusing to extract path outside destination: {member.filename}"
+                )
 
         for member in members:
             target = Path(wheel.extract(member, dest))
@@ -108,9 +117,13 @@ def _safe_extract(archive: Path, dest: Path) -> None:
 
 
 def _find_vtk_dir(root: Path) -> Path:
-    candidates = sorted(root.rglob("VTKConfig.cmake")) + sorted(root.rglob("vtk-config.cmake"))
+    candidates = sorted(root.rglob("VTKConfig.cmake")) + sorted(
+        root.rglob("vtk-config.cmake")
+    )
     if not candidates:
-        raise RuntimeError(f"Could not find VTKConfig.cmake or vtk-config.cmake under {root}")
+        raise RuntimeError(
+            f"Could not find VTKConfig.cmake or vtk-config.cmake under {root}"
+        )
 
     preferred = [
         path
@@ -134,7 +147,9 @@ def main() -> int:
     args = parser.parse_args()
 
     if args.version != SUPPORTED_VERSION:
-        raise RuntimeError(f"remesh-tools-bin is pinned to VTK {SUPPORTED_VERSION}, got {args.version}")
+        raise RuntimeError(
+            f"sim-asset-tools is pinned to VTK {SUPPORTED_VERSION}, got {args.version}"
+        )
 
     override = os.environ.get("REMESH_TOOLS_BIN_VTK_SDK_DIR")
     if override:
