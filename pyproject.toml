@@ -54,6 +54,9 @@ dev = [
 [tool.ruff]
 exclude = ["native/vendor"]
 
+[tool.pytest.ini_options]
+pythonpath = [".", "src"]
+
 [tool.scikit-build]
 minimum-version = "build-system.requires"
 build-dir = "build/{wheel_tag}"
