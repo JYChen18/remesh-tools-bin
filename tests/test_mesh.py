@@ -5,11 +5,11 @@ import unittest
 
 
 @unittest.skipUnless(importlib.util.find_spec("numpy"), "requires numpy")
-class MeshValidationTest(unittest.TestCase):
-    def test_checks_each_component_without_optional_graph_engine(self) -> None:
+class MeshTests(unittest.TestCase):
+    def test_validation_checks_orientation_of_every_component(self) -> None:
         import numpy as np
 
-        from sim_asset_tools.mesh.validation import validate_mesh
+        from sim_asset_tools.mesh import validate_mesh
 
         class Mesh:
             is_watertight = True
