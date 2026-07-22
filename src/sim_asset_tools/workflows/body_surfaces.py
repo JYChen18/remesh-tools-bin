@@ -18,8 +18,7 @@
 from __future__ import annotations
 
 import hashlib
-import os
-import tempfile
+import shutil
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -36,6 +35,12 @@ from ..formats.manifest import (
 from ..formats.mujoco_model import load_mujoco_model
 from ..mesh.io import load_mesh
 from ..mesh.validation import validate_mesh
+from .._publish import (
+    create_staging_directory,
+    ensure_output_available,
+    ensure_safe_output,
+    publish_directory,
+)
 from ._surface import SurfaceRecipe, prepare_surface
 
 CONTRACT_VERSION = "body-surfaces/v1"
@@ -327,9 +332,6 @@ def prepare_body_surfaces(
             "Body-surface geometry is unsupported:\n" + "\n".join(plan.errors)
         )
     selected = _selected_bodies(plan, bodies)
-    output_directory.mkdir(parents=True, exist_ok=True)
-    meshes_directory = output_directory / "meshes"
-    meshes_directory.mkdir(parents=True, exist_ok=True)
     manifest_path = output_directory / MANIFEST_NAME
     if manifest_path.exists() and not overwrite:
         existing_errors = check_body_surfaces(model_path, manifest_path, bodies=bodies)
@@ -340,11 +342,15 @@ def prepare_body_surfaces(
             f"Existing body-surface asset is not reusable: {manifest_path}; "
             "pass overwrite=True to replace it"
         )
-
-    work_directory = Path(tempfile.mkdtemp(prefix=".work-", dir=output_directory))
-    body_records: dict[str, dict[str, object]] = {}
-    succeeded = False
+    ensure_safe_output(model_path, output_directory)
+    ensure_output_available(output_directory, overwrite=overwrite)
+    staging_directory = create_staging_directory(output_directory)
+    meshes_directory = staging_directory / "meshes"
+    meshes_directory.mkdir()
+    work_directory = staging_directory / ".work"
+    work_directory.mkdir()
     try:
+        body_records: dict[str, dict[str, object]] = {}
         for body in selected:
             source_mesh = build_body_source_mesh(model, body)
             filename = _filename(body)
@@ -367,11 +373,11 @@ def prepare_body_surfaces(
             generated_mesh.export(staged_path)
             published_mesh = load_mesh(staged_path)
             output_path = meshes_directory / filename
-            os.replace(staged_path, output_path)
+            shutil.move(staged_path, output_path)
             body_records[body.name] = {
                 "body_id": body.body_id,
                 "mesh": {
-                    "path": relative_artifact_path(output_directory, output_path),
+                    "path": relative_artifact_path(staging_directory, output_path),
                     "sha256": sha256_file(output_path),
                 },
                 "source_mesh_sha256": mesh_fingerprint(source_mesh),
@@ -393,14 +399,19 @@ def prepare_body_surfaces(
                 body.name or f"body_{body.body_id}" for body in plan.procedural.values()
             ],
         }
-        write_manifest(manifest_path, manifest)
-        succeeded = True
-        return manifest_path
-    finally:
-        if succeeded and not keep_work:
-            import shutil
-
+        if not keep_work:
             shutil.rmtree(work_directory)
+        write_manifest(staging_directory / MANIFEST_NAME, manifest)
+        publish_directory(
+            staging_directory,
+            output_directory,
+            overwrite=overwrite,
+        )
+        return manifest_path
+    except BaseException:
+        if staging_directory.exists() and not keep_work:
+            shutil.rmtree(staging_directory)
+        raise
 
 
 def check_body_surfaces(

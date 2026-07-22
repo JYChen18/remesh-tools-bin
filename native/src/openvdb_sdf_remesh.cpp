@@ -77,7 +77,7 @@ Options parse_args(int argc, char** argv) {
       usage(std::cout);
       std::exit(0);
     }
-    if (arg == "-r" || arg == "--resolution" || arg == "--scale") {
+    if (arg == "-r" || arg == "--resolution") {
       if (++i == argc) {
         throw std::runtime_error(arg + " requires a value");
       }

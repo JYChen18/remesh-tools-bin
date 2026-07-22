@@ -16,6 +16,7 @@ class CliTests(unittest.TestCase):
             stale = output / "part_999.obj"
             stale.touch()
             part = mock.Mock()
+            part.export.side_effect = lambda path: Path(path).touch()
 
             with (
                 mock.patch(
@@ -31,7 +32,7 @@ class CliTests(unittest.TestCase):
 
             self.assertEqual(result, 0)
             self.assertFalse(stale.exists())
-            part.export.assert_called_once_with(output / "part_000.obj")
+            self.assertTrue((output / "part_000.obj").is_file())
 
     def test_acvd_forwards_structured_arguments(self) -> None:
         with tempfile.TemporaryDirectory() as value:
