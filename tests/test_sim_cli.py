@@ -2,11 +2,10 @@ from __future__ import annotations
 
 import tempfile
 import unittest
-import warnings
 from pathlib import Path
 from unittest import mock
 
-from sim_asset_tools import cli, legacy
+from sim_asset_tools import cli
 
 
 class SimAssetsCliTest(unittest.TestCase):
@@ -59,18 +58,6 @@ class SimAssetsCliTest(unittest.TestCase):
         )
 
         self.assertEqual(args.prepare_command, "body-surfaces")
-
-    def test_legacy_command_warns_and_forwards(self) -> None:
-        with mock.patch.object(legacy, "_legacy_main", return_value=0) as run:
-            with warnings.catch_warnings(record=True) as caught:
-                warnings.simplefilter("always")
-                result = legacy.main(
-                    ["acvd", "input.obj", "output.ply", "--vertices", "4"]
-                )
-
-        self.assertEqual(result, 0)
-        run.assert_called_once()
-        self.assertIn("deprecated", str(caught[0].message))
 
 
 if __name__ == "__main__":

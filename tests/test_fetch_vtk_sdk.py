@@ -45,7 +45,9 @@ class VtkSdkWheelTests(unittest.TestCase):
     def test_unknown_platform_is_rejected(self) -> None:
         with (
             mock.patch.object(fetch_vtk_sdk.sys, "platform", "linux"),
-            mock.patch.object(fetch_vtk_sdk.platform, "machine", return_value="riscv64"),
+            mock.patch.object(
+                fetch_vtk_sdk.platform, "machine", return_value="riscv64"
+            ),
             self.assertRaisesRegex(RuntimeError, "not known for platform"),
         ):
             fetch_vtk_sdk._platform_tag()

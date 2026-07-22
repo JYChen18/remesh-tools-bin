@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from remesh_tools_bin import _cli
+from sim_asset_tools import native
 
 
 class NativeEnvironmentTests(unittest.TestCase):
@@ -19,34 +19,32 @@ class NativeEnvironmentTests(unittest.TestCase):
             vtk_libs_dir.mkdir()
 
             with mock.patch.object(
-                _cli, "_vtkmodules_dir", return_value=vtkmodules_dir
+                native, "_vtkmodules_dir", return_value=vtkmodules_dir
             ):
-                library_dirs = _cli._vtk_library_dirs()
+                library_dirs = native._vtk_library_dirs()
 
             self.assertEqual(library_dirs, (vtk_libs_dir, vtkmodules_dir))
 
     def test_includes_delvewheel_library_directory(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:
             site_packages = Path(temporary_directory)
-            package_dir = site_packages / "remesh_tools_bin"
-            native_package_dir = site_packages / "sim_asset_tools"
-            vendored_dir = site_packages / "remesh_tools_bin.libs"
+            package_dir = site_packages / "sim_asset_tools"
+            vendored_dir = site_packages / "sim_asset_tools.libs"
             package_dir.mkdir()
-            native_package_dir.mkdir()
-            (native_package_dir / "_native" / "bin").mkdir(parents=True)
-            (native_package_dir / "_native" / "lib").mkdir()
+            (package_dir / "_native" / "bin").mkdir(parents=True)
+            (package_dir / "_native" / "lib").mkdir()
             vendored_dir.mkdir()
 
-            fake_cli = package_dir / "_cli.py"
+            fake_native = package_dir / "native.py"
             with (
-                mock.patch.object(_cli, "__file__", str(fake_cli)),
-                mock.patch.object(_cli, "_vtk_library_dirs", return_value=()),
+                mock.patch.object(native, "__file__", str(fake_native)),
+                mock.patch.object(native, "_vtk_library_dirs", return_value=()),
             ):
-                env = _cli._native_env()
+                env = native._native_env()
 
             if os.name == "nt":
                 path_key = "PATH"
-            elif _cli.sys.platform == "darwin":
+            elif native.sys.platform == "darwin":
                 path_key = "DYLD_LIBRARY_PATH"
             else:
                 path_key = "LD_LIBRARY_PATH"
@@ -54,8 +52,8 @@ class NativeEnvironmentTests(unittest.TestCase):
             self.assertEqual(
                 paths[:3],
                 [
-                    str(native_package_dir / "_native" / "bin"),
-                    str(native_package_dir / "_native" / "lib"),
+                    str(package_dir / "_native" / "bin"),
+                    str(package_dir / "_native" / "lib"),
                     str(vendored_dir),
                 ],
             )

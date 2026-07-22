@@ -44,12 +44,6 @@ sim-assets mesh acvd input.obj output.ply \
 sim-assets mesh coacd input.obj collision/
 ```
 
-The old command remains available for the `0.2.x` transition:
-
-```bash
-remesh acvd input.obj output.ply --vertices 3000 --gradation 1.5
-```
-
 ## Object bundles
 
 Prepare one object or every supported mesh in a folder:

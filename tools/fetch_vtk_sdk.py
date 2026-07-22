@@ -136,7 +136,7 @@ def _find_vtk_dir(root: Path) -> Path:
 def _write_cmake_output(path: Path, vtk_dir: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     escaped = str(vtk_dir).replace("\\", "/")
-    path.write_text(f'set(REMESH_TOOLS_BIN_VTK_DIR "{escaped}")\n', encoding="utf-8")
+    path.write_text(f'set(SIM_ASSET_TOOLS_VTK_DIR "{escaped}")\n', encoding="utf-8")
 
 
 def main() -> int:
@@ -151,7 +151,7 @@ def main() -> int:
             f"sim-asset-tools is pinned to VTK {SUPPORTED_VERSION}, got {args.version}"
         )
 
-    override = os.environ.get("REMESH_TOOLS_BIN_VTK_SDK_DIR")
+    override = os.environ.get("SIM_ASSET_TOOLS_VTK_SDK_DIR")
     if override:
         vtk_dir = _find_vtk_dir(Path(override))
         _write_cmake_output(args.cmake_output, vtk_dir)
@@ -161,7 +161,7 @@ def main() -> int:
     archive_name = _sdk_archive_name(args.version)
     archive = args.dest / "downloads" / archive_name
     sdk_root = args.dest / "sdk" / archive_name.removesuffix(".whl")
-    stamp = sdk_root / ".remesh-tools-bin-extracted"
+    stamp = sdk_root / ".sim-asset-tools-extracted"
 
     _download(f"{BASE_URL}/{archive_name}", archive)
     if not stamp.exists():
