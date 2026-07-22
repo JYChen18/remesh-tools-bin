@@ -46,15 +46,10 @@ def _native_lib_dir() -> Path:
 
 def _vendored_library_dirs() -> tuple[Path, ...]:
     package_dir = Path(__file__).resolve().parent
-    candidates = [
-        package_dir.parent / "sim_asset_tools.libs",
-        package_dir.parent / "remesh_tools_bin.libs",
-    ]
+    candidates = [package_dir.parent / "sim_asset_tools.libs"]
     for entry in sys.path:
         root = Path(entry or ".").resolve()
-        candidates.extend(
-            (root / "sim_asset_tools.libs", root / "remesh_tools_bin.libs")
-        )
+        candidates.append(root / "sim_asset_tools.libs")
     return tuple(dict.fromkeys(path for path in candidates if path.is_dir()))
 
 

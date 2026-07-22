@@ -1,64 +1,57 @@
 from __future__ import annotations
 
-import os
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
-from remesh_tools_bin import _cli
+from sim_asset_tools import cli
 
 
-class NativeEnvironmentTests(unittest.TestCase):
-    def test_includes_windows_vtk_library_directory(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            site_packages = Path(temporary_directory)
-            vtkmodules_dir = site_packages / "vtkmodules"
-            vtk_libs_dir = site_packages / "vtk.libs"
-            vtkmodules_dir.mkdir()
-            vtk_libs_dir.mkdir()
+class CliTests(unittest.TestCase):
+    def test_coacd_overwrite_removes_stale_parts(self) -> None:
+        with tempfile.TemporaryDirectory() as value:
+            output = Path(value) / "parts"
+            output.mkdir()
+            stale = output / "part_999.obj"
+            stale.touch()
+            part = mock.Mock()
+            part.export.side_effect = lambda path: Path(path).touch()
 
-            with mock.patch.object(
-                _cli, "_vtkmodules_dir", return_value=vtkmodules_dir
-            ):
-                library_dirs = _cli._vtk_library_dirs()
-
-            self.assertEqual(library_dirs, (vtk_libs_dir, vtkmodules_dir))
-
-    def test_includes_delvewheel_library_directory(self) -> None:
-        with tempfile.TemporaryDirectory() as temporary_directory:
-            site_packages = Path(temporary_directory)
-            package_dir = site_packages / "remesh_tools_bin"
-            native_package_dir = site_packages / "sim_asset_tools"
-            vendored_dir = site_packages / "remesh_tools_bin.libs"
-            package_dir.mkdir()
-            native_package_dir.mkdir()
-            (native_package_dir / "_native" / "bin").mkdir(parents=True)
-            (native_package_dir / "_native" / "lib").mkdir()
-            vendored_dir.mkdir()
-
-            fake_cli = package_dir / "_cli.py"
             with (
-                mock.patch.object(_cli, "__file__", str(fake_cli)),
-                mock.patch.object(_cli, "_vtk_library_dirs", return_value=()),
+                mock.patch(
+                    "sim_asset_tools.mesh.io.load_mesh", return_value=mock.Mock()
+                ),
+                mock.patch(
+                    "sim_asset_tools.mesh.coacd.decompose_mesh", return_value=[part]
+                ),
             ):
-                env = _cli._native_env()
+                result = cli.main(
+                    ["mesh", "coacd", "in.obj", str(output), "--overwrite"]
+                )
 
-            if os.name == "nt":
-                path_key = "PATH"
-            elif _cli.sys.platform == "darwin":
-                path_key = "DYLD_LIBRARY_PATH"
-            else:
-                path_key = "LD_LIBRARY_PATH"
-            paths = env[path_key].split(os.pathsep)
-            self.assertEqual(
-                paths[:3],
-                [
-                    str(native_package_dir / "_native" / "bin"),
-                    str(native_package_dir / "_native" / "lib"),
-                    str(vendored_dir),
-                ],
-            )
+            self.assertEqual(result, 0)
+            self.assertFalse(stale.exists())
+            self.assertTrue((output / "part_000.obj").is_file())
+
+    def test_acvd_forwards_structured_arguments(self) -> None:
+        with tempfile.TemporaryDirectory() as value:
+            output = Path(value) / "out.ply"
+            with mock.patch("sim_asset_tools.mesh.acvd.acvd_remesh") as remesh:
+                result = cli.main(
+                    [
+                        "mesh",
+                        "acvd",
+                        "in.obj",
+                        str(output),
+                        "--vertices",
+                        "42",
+                    ]
+                )
+
+            self.assertEqual(result, 0)
+            remesh.assert_called_once()
+            self.assertEqual(remesh.call_args.kwargs["vertices"], 42)
 
 
 if __name__ == "__main__":

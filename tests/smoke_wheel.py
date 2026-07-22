@@ -7,8 +7,8 @@ import sys
 import tempfile
 from pathlib import Path
 
-from remesh_tools_bin._cli import _native_env, _tool_path, main, run_native
 from sim_asset_tools.cli import main as sim_assets_main
+from sim_asset_tools.native import _native_env, _tool_path, run_native
 
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "tetrahedron.obj"
@@ -91,9 +91,12 @@ def run_acvd_cases(temporary_path: Path) -> None:
     for method, tool, cli_extra, native_extra in ACVD_CASES:
         output = temporary_path / f"{method}.ply"
         argv = [
-            method,
+            "mesh",
+            "acvd",
             str(FIXTURE),
             str(output),
+            "--method",
+            method,
             "--vertices",
             "4",
             "--gradation",
@@ -102,7 +105,7 @@ def run_acvd_cases(temporary_path: Path) -> None:
             "1",
             *cli_extra,
         ]
-        result = main(argv)
+        result = sim_assets_main(argv)
         if result != 0:
             if result < 0:
                 native_args = [
@@ -189,9 +192,10 @@ def run() -> None:
         temporary_path = Path(temporary_directory)
         openvdb_output = temporary_path / "openvdb.obj"
 
-        openvdb_result = main(
+        openvdb_result = sim_assets_main(
             [
-                "openvdb-sdf",
+                "mesh",
+                "openvdb",
                 str(FIXTURE),
                 str(openvdb_output),
                 "--resolution",
@@ -203,22 +207,6 @@ def run() -> None:
                 f"OpenVDB smoke test failed with exit code {openvdb_result}"
             )
         require_output(openvdb_output)
-        structured_output = temporary_path / "sim-assets-openvdb.obj"
-        structured_result = sim_assets_main(
-            [
-                "mesh",
-                "openvdb",
-                str(FIXTURE),
-                str(structured_output),
-                "--resolution",
-                "10",
-            ]
-        )
-        if structured_result != 0:
-            raise RuntimeError(
-                f"sim-assets smoke test failed with exit code {structured_result}"
-            )
-        require_output(structured_output)
         run_acvd_cases(temporary_path)
         run_volume_analysis(temporary_path)
 

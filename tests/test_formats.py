@@ -5,7 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from sim_asset_tools.manifest import (
+from sim_asset_tools.formats.manifest import (
     SCHEMA_VERSION,
     load_manifest,
     resolve_artifact,
@@ -15,8 +15,8 @@ from sim_asset_tools.manifest import (
 )
 
 
-class ManifestTest(unittest.TestCase):
-    def test_round_trip_and_file_verification(self) -> None:
+class ManifestFormatTests(unittest.TestCase):
+    def test_round_trip_verifies_artifacts_and_detects_changes(self) -> None:
         with tempfile.TemporaryDirectory() as value:
             root = Path(value)
             artifact = root / "meshes" / "part.obj"
@@ -33,9 +33,14 @@ class ManifestTest(unittest.TestCase):
 
             self.assertEqual(load_manifest(root), manifest)
             self.assertEqual(verify_file_records(root, [manifest["source"]]), [])
-            self.assertFalse(any(root.glob(".asset.json.*.tmp")))
 
-    def test_rejects_path_traversal(self) -> None:
+            artifact.write_text("changed\n", encoding="utf-8")
+            self.assertEqual(
+                verify_file_records(root, [manifest["source"]]),
+                ["artifact hash does not match: meshes/part.obj"],
+            )
+
+    def test_rejects_artifact_path_traversal(self) -> None:
         with tempfile.TemporaryDirectory() as value:
             with self.assertRaisesRegex(ValueError, "relative and contained"):
                 resolve_artifact(Path(value), "../outside.obj")

@@ -121,24 +121,37 @@ def _mesh_acvd(args: argparse.Namespace) -> int:
 def _mesh_coacd(args: argparse.Namespace) -> int:
     from .mesh.coacd import decompose_mesh
     from .mesh.io import load_mesh
-
-    output = Path(args.output)
-    if output.exists() and any(output.iterdir()):
-        if not args.overwrite:
-            raise FileExistsError(f"Output directory is not empty: {output}")
-        shutil.rmtree(output)
-    output.mkdir(parents=True, exist_ok=True)
-    parts = decompose_mesh(
-        load_mesh(args.input),
-        threshold=args.threshold,
-        max_convex_hull=args.max_convex_hull,
-        preprocess_mode=args.preprocess_mode,
-        preprocess_resolution=args.preprocess_resolution,
-        real_metric=args.real_metric,
-        seed=args.seed,
+    from ._publish import (
+        create_staging_directory,
+        ensure_output_available,
+        ensure_safe_output,
+        publish_directory,
     )
-    for index, part in enumerate(parts):
-        part.export(output / f"part_{index:03d}.obj")
+
+    input_path = Path(args.input).expanduser().resolve()
+    output = Path(args.output).expanduser().resolve()
+    ensure_safe_output(input_path, output)
+    ensure_output_available(output, overwrite=args.overwrite)
+    staging_directory = create_staging_directory(output)
+    try:
+        parts = decompose_mesh(
+            load_mesh(input_path),
+            threshold=args.threshold,
+            max_convex_hull=args.max_convex_hull,
+            preprocess_mode=args.preprocess_mode,
+            preprocess_resolution=args.preprocess_resolution,
+            real_metric=args.real_metric,
+            seed=args.seed,
+        )
+        if not parts:
+            raise RuntimeError("CoACD did not produce any collision parts")
+        for index, part in enumerate(parts):
+            part.export(staging_directory / f"part_{index:03d}.obj")
+        publish_directory(staging_directory, output, overwrite=args.overwrite)
+    except BaseException:
+        if staging_directory.exists():
+            shutil.rmtree(staging_directory)
+        raise
     print(f"wrote {len(parts)} parts to {output}")
     return 0
 

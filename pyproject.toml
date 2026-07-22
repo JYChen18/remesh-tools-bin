@@ -14,7 +14,7 @@ license = "Apache-2.0"
 license-files = [
   "LICENSE",
   "licenses/*.txt",
-  "third_party/ACVD/LICENSE.txt",
+  "native/vendor/ACVD/LICENSE.txt",
 ]
 authors = [
   { name = "sim-asset-tools maintainers" },
@@ -32,18 +32,17 @@ Repository = "https://github.com/JYChen18/sim-asset-tools"
 
 [project.scripts]
 sim-assets = "sim_asset_tools.cli:main"
-remesh = "sim_asset_tools.legacy:main"
 
 [project.optional-dependencies]
 coacd = [
   "coacd>=1.0.11",
 ]
 mujoco = [
-  "mujoco>=3.3",
+  "mujoco>=3.9.0",
 ]
 all = [
   "coacd>=1.0.11",
-  "mujoco>=3.3",
+  "mujoco>=3.9.0",
 ]
 
 [dependency-groups]
@@ -52,10 +51,16 @@ dev = [
   "ruff>=0.12",
 ]
 
+[tool.ruff]
+exclude = ["native/vendor"]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "src"]
+
 [tool.scikit-build]
 minimum-version = "build-system.requires"
 build-dir = "build/{wheel_tag}"
-wheel.packages = ["src/remesh_tools_bin", "src/sim_asset_tools"]
+wheel.packages = ["src/sim_asset_tools"]
 wheel.py-api = "py3"
 sdist.inclusion-mode = "explicit"
 sdist.include = [
@@ -63,13 +68,9 @@ sdist.include = [
   "/LICENSE",
   "/README.md",
   "/pyproject.toml",
-  "/cmake/**",
   "/licenses/**",
   "/native/**",
-  "/src/remesh_tools_bin/**",
   "/src/sim_asset_tools/**",
-  "/third_party/ACVD/**",
-  "/tools/**",
 ]
 sdist.exclude = [
   "/build/**",

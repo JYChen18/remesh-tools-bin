@@ -90,10 +90,13 @@ def write_manifest(path: str | os.PathLike[str], value: dict[str, Any]) -> None:
             temporary.unlink()
 
 
-def verify_file_records(root: Path, records: Iterable[dict[str, Any]]) -> list[str]:
+def verify_file_records(root: Path, records: Iterable[object]) -> list[str]:
     """Return validation errors for manifest records containing path and sha256."""
     errors: list[str] = []
     for record in records:
+        if not isinstance(record, dict):
+            errors.append("artifact record must be an object")
+            continue
         value = record.get("path")
         if not isinstance(value, str):
             errors.append("artifact record is missing a string path")

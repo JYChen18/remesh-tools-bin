@@ -24,6 +24,12 @@ from ..mesh.coacd import decompose_mesh
 from ..mesh.io import load_mesh
 from ..mesh.normalize import normalize_mesh
 from ..mesh.validation import validate_mesh
+from .._publish import (
+    create_staging_directory,
+    ensure_output_available,
+    ensure_safe_output,
+    publish_directory,
+)
 from ._surface import SurfaceRecipe, prepare_surface
 
 SUPPORTED_INPUT_SUFFIXES = frozenset({".glb", ".obj", ".ply", ".stl"})
@@ -113,100 +119,116 @@ def prepare_object(
         raise ValueError(f"Input mesh does not exist: {input_path}")
     if input_path.suffix.lower() not in SUPPORTED_INPUT_SUFFIXES:
         raise ValueError(f"Unsupported input mesh suffix: {input_path.suffix}")
-    if output_directory.exists() and any(output_directory.iterdir()):
-        if not overwrite:
-            raise FileExistsError(
-                f"Output directory is not empty: {output_directory}; pass overwrite=True to replace it"
+    ensure_safe_output(input_path, output_directory)
+    ensure_output_available(output_directory, overwrite=overwrite)
+    staging_directory = create_staging_directory(output_directory)
+
+    try:
+        source_directory = staging_directory / "source"
+        visual_directory = staging_directory / "visual"
+        collision_directory = staging_directory / "collision" / "coacd"
+        models_directory = staging_directory / "models"
+        for directory in (
+            source_directory,
+            visual_directory,
+            collision_directory,
+            models_directory,
+        ):
+            directory.mkdir(parents=True, exist_ok=True)
+
+        source_copy = source_directory / f"source{input_path.suffix.lower()}"
+        shutil.copy2(input_path, source_copy)
+        mesh = load_mesh(input_path)
+        if recipe.normalize:
+            processing_mesh, center, scale = normalize_mesh(mesh)
+        else:
+            processing_mesh, center, scale = mesh.copy(), [0.0, 0.0, 0.0], 1.0
+
+        with tempfile.TemporaryDirectory(
+            prefix=".work-", dir=staging_directory
+        ) as work_value:
+            work_directory = Path(work_value)
+            processing_source = work_directory / "source.obj"
+            processing_mesh.export(processing_source)
+            acvd_output = work_directory / "simplified.ply"
+            prepare_surface(
+                processing_source,
+                acvd_output,
+                work_directory / "surface",
+                recipe.surface,
             )
-        shutil.rmtree(output_directory)
-    output_directory.mkdir(parents=True, exist_ok=True)
+            visual_mesh = load_mesh(acvd_output)
+            visual_path = visual_directory / "mesh.obj"
+            visual_mesh.export(visual_path)
 
-    source_directory = output_directory / "source"
-    visual_directory = output_directory / "visual"
-    collision_directory = output_directory / "collision" / "coacd"
-    models_directory = output_directory / "models"
-    for directory in (
-        source_directory,
-        visual_directory,
-        collision_directory,
-        models_directory,
-    ):
-        directory.mkdir(parents=True, exist_ok=True)
-
-    source_copy = source_directory / f"source{input_path.suffix.lower()}"
-    shutil.copy2(input_path, source_copy)
-    mesh = load_mesh(input_path)
-    if recipe.normalize:
-        processing_mesh, center, scale = normalize_mesh(mesh)
-    else:
-        processing_mesh, center, scale = mesh.copy(), [0.0, 0.0, 0.0], 1.0
-
-    with tempfile.TemporaryDirectory(
-        prefix=".work-", dir=output_directory
-    ) as work_value:
-        work_directory = Path(work_value)
-        processing_source = work_directory / "source.obj"
-        processing_mesh.export(processing_source)
-        acvd_output = work_directory / "simplified.ply"
-        prepare_surface(
-            processing_source,
-            acvd_output,
-            work_directory / "surface",
-            recipe.surface,
+        collision_meshes = decompose_mesh(
+            visual_mesh,
+            threshold=recipe.coacd_threshold,
+            max_convex_hull=recipe.coacd_max_convex_hull,
+            preprocess_mode=recipe.coacd_preprocess_mode,
+            preprocess_resolution=recipe.coacd_preprocess_resolution,
+            real_metric=recipe.coacd_real_metric,
+            seed=recipe.seed,
         )
-        visual_mesh = load_mesh(acvd_output)
-        visual_path = visual_directory / "mesh.obj"
-        visual_mesh.export(visual_path)
+        if not collision_meshes:
+            raise RuntimeError("CoACD did not produce any collision parts")
+        collision_paths: list[Path] = []
+        for index, collision_mesh in enumerate(collision_meshes):
+            errors = validate_mesh(collision_mesh)
+            if errors:
+                raise ValueError(f"CoACD part {index} is invalid: {'; '.join(errors)}")
+            collision_path = collision_directory / f"part_{index:03d}.obj"
+            collision_mesh.export(collision_path)
+            collision_paths.append(collision_path)
 
-    collision_meshes = decompose_mesh(
-        visual_mesh,
-        threshold=recipe.coacd_threshold,
-        max_convex_hull=recipe.coacd_max_convex_hull,
-        preprocess_mode=recipe.coacd_preprocess_mode,
-        preprocess_resolution=recipe.coacd_preprocess_resolution,
-        real_metric=recipe.coacd_real_metric,
-        seed=recipe.seed,
+        mjcf_path = models_directory / "model.xml" if "mjcf" in formats else None
+        urdf_path = models_directory / "model.urdf" if "urdf" in formats else None
+        if mjcf_path is not None:
+            write_object_mjcf(mjcf_path, visual_path, collision_paths)
+        if urdf_path is not None:
+            write_object_urdf(urdf_path, visual_path, collision_paths)
+        combined_collision = trimesh.util.concatenate(collision_meshes)
+        manifest = {
+            "schema": SCHEMA_VERSION,
+            "kind": "object",
+            "tool": {"name": "sim-asset-tools", "version": __version__},
+            "source": _record(staging_directory, source_copy),
+            "transform": {
+                "normalized": recipe.normalize,
+                "center": center,
+                "scale": scale,
+            },
+            "visual": {"mesh": _record(staging_directory, visual_path)},
+            "collision": {
+                "type": "convex_decomposition",
+                "parts": [_record(staging_directory, path) for path in collision_paths],
+            },
+            "models": {
+                name: _record(staging_directory, path)
+                for name, path in (("mjcf", mjcf_path), ("urdf", urdf_path))
+                if path is not None
+            },
+            "mass_properties": _mass_properties(combined_collision),
+            "recipes": {"object": asdict(recipe)},
+        }
+        write_manifest(staging_directory / MANIFEST_NAME, manifest)
+        publish_directory(
+            staging_directory,
+            output_directory,
+            overwrite=overwrite,
+        )
+    except BaseException:
+        if staging_directory.exists():
+            shutil.rmtree(staging_directory)
+        raise
+
+    final_models_directory = output_directory / "models"
+    return ObjectResult(
+        output_directory,
+        output_directory / MANIFEST_NAME,
+        final_models_directory / "model.xml" if "mjcf" in formats else None,
+        final_models_directory / "model.urdf" if "urdf" in formats else None,
     )
-    if not collision_meshes:
-        raise RuntimeError("CoACD did not produce any collision parts")
-    collision_paths: list[Path] = []
-    for index, collision_mesh in enumerate(collision_meshes):
-        errors = validate_mesh(collision_mesh)
-        if errors:
-            raise ValueError(f"CoACD part {index} is invalid: {'; '.join(errors)}")
-        collision_path = collision_directory / f"part_{index:03d}.obj"
-        collision_mesh.export(collision_path)
-        collision_paths.append(collision_path)
-
-    mjcf_path = models_directory / "model.xml" if "mjcf" in formats else None
-    urdf_path = models_directory / "model.urdf" if "urdf" in formats else None
-    if mjcf_path is not None:
-        write_object_mjcf(mjcf_path, visual_path, collision_paths)
-    if urdf_path is not None:
-        write_object_urdf(urdf_path, visual_path, collision_paths)
-    combined_collision = trimesh.util.concatenate(collision_meshes)
-    manifest = {
-        "schema": SCHEMA_VERSION,
-        "kind": "object",
-        "tool": {"name": "sim-asset-tools", "version": __version__},
-        "source": _record(output_directory, source_copy),
-        "transform": {"normalized": recipe.normalize, "center": center, "scale": scale},
-        "visual": {"mesh": _record(output_directory, visual_path)},
-        "collision": {
-            "type": "convex_decomposition",
-            "parts": [_record(output_directory, path) for path in collision_paths],
-        },
-        "models": {
-            name: _record(output_directory, path)
-            for name, path in (("mjcf", mjcf_path), ("urdf", urdf_path))
-            if path is not None
-        },
-        "mass_properties": _mass_properties(combined_collision),
-        "recipes": {"object": asdict(recipe)},
-    }
-    manifest_path = output_directory / MANIFEST_NAME
-    write_manifest(manifest_path, manifest)
-    return ObjectResult(output_directory, manifest_path, mjcf_path, urdf_path)
 
 
 def check_object(path_or_directory: str | Path) -> list[str]:
@@ -218,15 +240,49 @@ def check_object(path_or_directory: str | Path) -> list[str]:
     if manifest.get("kind") != "object":
         return [f"manifest kind is not object: {manifest.get('kind')!r}"]
     root = manifest_path.parent
-    records = [manifest.get("source", {})]
-    records.append(manifest.get("visual", {}).get("mesh", {}))
-    records.extend(manifest.get("collision", {}).get("parts", []))
-    records.extend(manifest.get("models", {}).values())
-    errors = verify_file_records(root, records)
-    for record in [manifest.get("visual", {}).get("mesh", {})] + list(
-        manifest.get("collision", {}).get("parts", [])
-    ):
-        if not isinstance(record, dict) or not isinstance(record.get("path"), str):
+    errors: list[str] = []
+    records: list[dict[str, object]] = []
+    mesh_records: list[dict[str, object]] = []
+
+    source = manifest.get("source")
+    if isinstance(source, dict):
+        records.append(source)
+    else:
+        errors.append("manifest source must be an object")
+
+    visual = manifest.get("visual")
+    visual_mesh = visual.get("mesh") if isinstance(visual, dict) else None
+    if isinstance(visual_mesh, dict):
+        records.append(visual_mesh)
+        mesh_records.append(visual_mesh)
+    else:
+        errors.append("manifest visual mesh must be an object")
+
+    collision = manifest.get("collision")
+    collision_parts = collision.get("parts") if isinstance(collision, dict) else None
+    if isinstance(collision_parts, list):
+        for index, record in enumerate(collision_parts):
+            if isinstance(record, dict):
+                records.append(record)
+                mesh_records.append(record)
+            else:
+                errors.append(f"manifest collision part {index} must be an object")
+    else:
+        errors.append("manifest collision parts must be an array")
+
+    models = manifest.get("models")
+    if isinstance(models, dict):
+        for name, record in models.items():
+            if isinstance(record, dict):
+                records.append(record)
+            else:
+                errors.append(f"manifest model {name!r} must be an object")
+    else:
+        errors.append("manifest models must be an object")
+
+    errors.extend(verify_file_records(root, records))
+    for record in mesh_records:
+        if not isinstance(record.get("path"), str):
             continue
         try:
             artifact = resolve_artifact(root, record["path"])

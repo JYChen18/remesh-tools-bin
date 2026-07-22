@@ -70,6 +70,3 @@ def prepare_objects(
     if failures:
         raise RuntimeError("Object preparation failed:\n" + "\n".join(failures))
     return [results[path] for path in inputs]
-
-
-prepare_folder = prepare_objects
