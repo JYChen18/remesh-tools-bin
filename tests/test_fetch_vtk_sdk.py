@@ -6,7 +6,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest import mock
 
-from tools import fetch_vtk_sdk
+from native.tools import fetch_vtk_sdk
 
 
 class VtkSdkWheelTests(unittest.TestCase):

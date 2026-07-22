@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from cmake.scripts import patch_openvdb_cmake
+from native.tools import patch_openvdb
 
 
 class OpenVdbPatchTests(unittest.TestCase):
@@ -28,7 +28,7 @@ class OpenVdbPatchTests(unittest.TestCase):
     def test_patches_legacy_clang_template_syntax(self) -> None:
         self.write_legacy_headers()
 
-        patch_openvdb_cmake.patch_legacy_headers(self.openvdb_dir)
+        patch_openvdb.patch_legacy_headers(self.openvdb_dir)
 
         node_manager = (self.openvdb_dir / "tree" / "NodeManager.h").read_text(
             encoding="utf-8"
@@ -43,8 +43,8 @@ class OpenVdbPatchTests(unittest.TestCase):
     def test_header_patch_is_idempotent(self) -> None:
         self.write_legacy_headers()
 
-        patch_openvdb_cmake.patch_legacy_headers(self.openvdb_dir)
-        patch_openvdb_cmake.patch_legacy_headers(self.openvdb_dir)
+        patch_openvdb.patch_legacy_headers(self.openvdb_dir)
+        patch_openvdb.patch_legacy_headers(self.openvdb_dir)
 
     def test_rejects_unexpected_legacy_header_shape(self) -> None:
         self.write_legacy_headers()
@@ -54,7 +54,7 @@ class OpenVdbPatchTests(unittest.TestCase):
         )
 
         with self.assertRaisesRegex(RuntimeError, "Expected 3 occurrence"):
-            patch_openvdb_cmake.patch_legacy_headers(self.openvdb_dir)
+            patch_openvdb.patch_legacy_headers(self.openvdb_dir)
 
 
 if __name__ == "__main__":

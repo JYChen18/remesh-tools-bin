@@ -9,6 +9,7 @@ set(SIM_ASSET_TOOLS_TBB_VERSION "v2022.0.0" CACHE STRING "oneTBB version used by
 set(SIM_ASSET_TOOLS_BOOST_VERSION "1.81.0" CACHE STRING "Boost version used by sim-asset-tools")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
 if(POLICY CMP0167)
   cmake_policy(SET CMP0167 NEW)
@@ -118,7 +119,7 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/AcademySoftwareFoundation/openvdb.git
   GIT_TAG "${SIM_ASSET_TOOLS_OPENVDB_VERSION}"
   PATCH_COMMAND
-    "${Python_EXECUTABLE}" "${PROJECT_SOURCE_DIR}/cmake/scripts/patch_openvdb_cmake.py"
+    "${Python_EXECUTABLE}" "${CMAKE_CURRENT_LIST_DIR}/../tools/patch_openvdb.py"
     "<SOURCE_DIR>/openvdb/openvdb/CMakeLists.txt"
   EXCLUDE_FROM_ALL
 )

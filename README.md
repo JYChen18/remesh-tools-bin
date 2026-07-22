@@ -30,6 +30,9 @@ uv sync --all-extras
 uv build --wheel
 ```
 
+Native source organization and dependency-update guidance live in
+[native/README.md](native/README.md).
+
 ## Mesh operations
 
 ```bash
@@ -100,7 +103,7 @@ complete.
 
 | Component | Version or source | Use | License |
 | --- | --- | --- | --- |
-| ACVD | Commit `275554980e466914ae9053c8667006f251989422` | Bundled remeshing tools | [CeCILL-B](third_party/ACVD/LICENSE.txt) |
+| ACVD | Commit `275554980e466914ae9053c8667006f251989422` | Bundled remeshing tools | [CeCILL-B](native/vendor/ACVD/LICENSE.txt) |
 | OpenVDB | `v8.2.0` | Statically linked SDF processing | [MPL 2.0](licenses/OpenVDB-MPL-2.0.txt) |
 | oneTBB | `v2022.0.0` | Bundled threading library | [Apache 2.0](licenses/oneTBB-Apache-2.0.txt) |
 | Boost | `1.81.0` | OpenVDB build dependency | [Boost Software License 1.0](licenses/Boost-BSL-1.0.txt) |

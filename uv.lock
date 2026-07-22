@@ -915,8 +915,8 @@ dev = [
 requires-dist = [
     { name = "coacd", marker = "extra == 'all'", specifier = ">=1.0.11" },
     { name = "coacd", marker = "extra == 'coacd'", specifier = ">=1.0.11" },
-    { name = "mujoco", marker = "extra == 'all'", specifier = ">=3.3" },
-    { name = "mujoco", marker = "extra == 'mujoco'", specifier = ">=3.3" },
+    { name = "mujoco", marker = "extra == 'all'", specifier = ">=3.9.0" },
+    { name = "mujoco", marker = "extra == 'mujoco'", specifier = ">=3.9.0" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "trimesh", specifier = ">=4.0" },
     { name = "vtk", specifier = "==9.6.2" },

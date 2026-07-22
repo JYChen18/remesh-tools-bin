@@ -1,3 +1,5 @@
+"""Patch OpenVDB 8 build files and legacy headers for modern toolchains."""
+
 from __future__ import annotations
 
 import argparse
@@ -67,13 +69,17 @@ def main() -> None:
     )
     if boost_replacement not in text:
         if boost_needle not in text:
-            raise RuntimeError(f"Could not find the OpenVDB Boost find_package line in {path}")
+            raise RuntimeError(
+                f"Could not find the OpenVDB Boost find_package line in {path}"
+            )
         text = text.replace(boost_needle, boost_replacement)
     if replacement in text:
         path.write_text(text, encoding="utf-8")
     else:
         if needle not in text:
-            raise RuntimeError(f"Could not find the OpenVDB TBB find_package line in {path}")
+            raise RuntimeError(
+                f"Could not find the OpenVDB TBB find_package line in {path}"
+            )
         path.write_text(text.replace(needle, replacement), encoding="utf-8")
 
     patch_legacy_headers(path.parent)

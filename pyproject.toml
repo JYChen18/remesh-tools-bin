@@ -14,7 +14,7 @@ license = "Apache-2.0"
 license-files = [
   "LICENSE",
   "licenses/*.txt",
-  "third_party/ACVD/LICENSE.txt",
+  "native/vendor/ACVD/LICENSE.txt",
 ]
 authors = [
   { name = "sim-asset-tools maintainers" },
@@ -38,11 +38,11 @@ coacd = [
   "coacd>=1.0.11",
 ]
 mujoco = [
-  "mujoco>=3.3",
+  "mujoco>=3.9.0",
 ]
 all = [
   "coacd>=1.0.11",
-  "mujoco>=3.3",
+  "mujoco>=3.9.0",
 ]
 
 [dependency-groups]
@@ -62,12 +62,9 @@ sdist.include = [
   "/LICENSE",
   "/README.md",
   "/pyproject.toml",
-  "/cmake/**",
   "/licenses/**",
   "/native/**",
   "/src/sim_asset_tools/**",
-  "/third_party/ACVD/**",
-  "/tools/**",
 ]
 sdist.exclude = [
   "/build/**",
