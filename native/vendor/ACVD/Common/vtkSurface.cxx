@@ -1965,8 +1965,9 @@ void vtkSurface::WriteToFile (const char *FileName)
 		for (p = filename; *p; ++p)
 			*p = tolower(*p);
 	}
+	const char *extension = strrchr(filename, '.');
 
-	if (strstr(filename,".vtk") != NULL) {
+	if (extension != NULL && strcmp(extension,".vtk") == 0) {
 		vtkPolyDataWriter *Writer = vtkPolyDataWriter::New();
 		Writer->SetInputData(this);
 #if ( ( VTK_MAJOR_VERSION >= 9 ) && ( VTK_MINOR_VERSION >= 1 ) )
@@ -1976,35 +1977,35 @@ void vtkSurface::WriteToFile (const char *FileName)
 		Writer->Write();
 	}
 
-	if (strstr(filename,".ply") != NULL) {
+	if (extension != NULL && strcmp(extension,".ply") == 0) {
 		vtkPLYWriter *Writer = vtkPLYWriter::New();
 		Writer->SetInputData(this);
 		Writer->SetFileName(FileName);
 		Writer->Write();
 	}
 
-	if (strstr(filename,".stl") != NULL) {
+	if (extension != NULL && strcmp(extension,".stl") == 0) {
 		vtkSTLWriter *Writer = vtkSTLWriter::New();
 		Writer->SetInputData(this);
 		Writer->SetFileName(FileName);
 		Writer->Write();
 	}
 
-	if (strstr(filename,".vtp") != NULL) {
+	if (extension != NULL && strcmp(extension,".vtp") == 0) {
 		vtkXMLPolyDataWriter *Writer = vtkXMLPolyDataWriter::New();
 		Writer->SetInputData(this);
 		Writer->SetFileName(FileName);
 		Writer->Write();
 	}
 
-	if (strstr(filename,".off") != NULL) {
+	if (extension != NULL && strcmp(extension,".off") == 0) {
 		vtkOFFWriter *Writer = vtkOFFWriter::New();
 		Writer->SetInputData(this);
 		Writer->SetFileName(FileName);
 		Writer->Write();
 	}
 
-	if (strstr(filename,".obj") != NULL) {
+	if (extension != NULL && strcmp(extension,".obj") == 0) {
 		vtkOBJWriter *Writer = vtkOBJWriter::New();
 		Writer->SetInputData(this);
 		Writer->SetFileName(FileName);

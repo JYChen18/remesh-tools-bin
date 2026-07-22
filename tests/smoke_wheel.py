@@ -122,6 +122,27 @@ def run_acvd_cases(temporary_path: Path) -> None:
             raise RuntimeError(f"{method} smoke test failed with exit code {result}")
         require_output(output)
 
+    dotted_output = temporary_path / ".object" / "output.ply"
+    result = sim_assets_main(
+        [
+            "mesh",
+            "acvd",
+            str(FIXTURE),
+            str(dotted_output),
+            "--vertices",
+            "4",
+            "--gradation",
+            "0",
+            "--subsample",
+            "1",
+        ]
+    )
+    if result != 0:
+        raise RuntimeError(f"ACVD dotted-path test failed with exit code {result}")
+    require_output(dotted_output)
+    if not dotted_output.read_bytes().startswith(b"ply"):
+        raise RuntimeError(f"ACVD wrote the wrong format: {dotted_output}")
+
 
 def write_volume_fixture(root: Path) -> Path:
     raw_path = root / "labels.raw"
