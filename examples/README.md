@@ -31,6 +31,30 @@ sim-assets mesh acvd \
   --vertices 1024 --gradation 1.5
 ```
 
+The command defaults to `--method acvd`. All seven packaged ACVD variants are
+available:
+
+| Method | Native tool | Additional options |
+| --- | --- | --- |
+| `acvd` | `ACVD` | |
+| `acvd-parallel` | `ACVDP` | `--threads` |
+| `acvd-quadric` | `ACVDQ` | `--quadric-level` |
+| `acvd-quadric-parallel` | `ACVDQP` | `--quadric-level`, `--threads` |
+| `acvd-anisotropic` | `AnisotropicRemeshing` | |
+| `acvd-anisotropic-quadric` | `AnisotropicRemeshingQ` | `--quadric-level` |
+| `acvd-anisotropic-quadric-parallel` | `AnisotropicRemeshingQP` | `--quadric-level`, `--threads` |
+
+For example, run parallel quadric remeshing with:
+
+```bash
+sim-assets mesh acvd \
+  examples/outputs/mesh/openvdb/object.obj \
+  examples/outputs/mesh/acvd/object-quadric-parallel.ply \
+  --method acvd-quadric-parallel \
+  --vertices 1024 --gradation 1.5 \
+  --quadric-level 1 --threads 8
+```
+
 Decompose the remeshed object into convex collision parts with CoACD:
 
 ```bash
