@@ -17,8 +17,7 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = "sim-asset/v1"
-OBJECT_SCHEMA_VERSION = "sim-object/v1"
+SCHEMA_VERSION = "sim-asset/v2"
 MANIFEST_NAME = "asset.json"
 
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
@@ -96,24 +95,18 @@ def load_manifest(path_or_directory: str | os.PathLike[str]) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise ValueError(f"Asset manifest must contain a JSON object: {path}")
     schema = value.get("schema")
-    if schema not in (SCHEMA_VERSION, OBJECT_SCHEMA_VERSION):
+    if schema != SCHEMA_VERSION:
         raise ValueError(
-            f"Unsupported asset manifest schema {schema!r}; expected one of "
-            f"{SCHEMA_VERSION!r}, {OBJECT_SCHEMA_VERSION!r}"
+            f"Unsupported asset manifest schema {schema!r}; expected {SCHEMA_VERSION!r}"
         )
-    if schema == SCHEMA_VERSION and value.get("kind") != "body-surfaces":
-        raise ValueError(f"Unsupported asset manifest kind: {value.get('kind')!r}")
     return value
 
 
 def write_manifest(path: str | os.PathLike[str], value: dict[str, Any]) -> None:
     """Atomically publish a manifest after all referenced artifacts are ready."""
     path = Path(path)
-    if value.get("schema") not in (SCHEMA_VERSION, OBJECT_SCHEMA_VERSION):
-        raise ValueError(
-            f"Manifest schema must be one of {SCHEMA_VERSION!r}, "
-            f"{OBJECT_SCHEMA_VERSION!r}"
-        )
+    if value.get("schema") != SCHEMA_VERSION:
+        raise ValueError(f"Manifest schema must be {SCHEMA_VERSION!r}")
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(value, indent=2, sort_keys=True) + "\n"
     descriptor, temporary_name = tempfile.mkstemp(
@@ -155,3 +148,62 @@ def verify_sha256_map(root: Path, value: object) -> list[str]:
         if sha256_file(path) != expected:
             errors.append(f"artifact hash does not match: {relative_path}")
     return errors
+
+
+def verify_manifest_metadata(
+    manifest: dict[str, Any],
+    names: tuple[str, ...],
+) -> list[str]:
+    """Verify JSON fingerprints for top-level metadata and the hash map itself."""
+    hashes = manifest.get("sha256")
+    if not isinstance(hashes, dict):
+        return ["manifest sha256 must be an object"]
+
+    errors: list[str] = []
+    for name in names:
+        _verify_json_fingerprint(
+            name,
+            manifest.get(name),
+            hashes.get(name),
+            errors,
+        )
+    other_hashes = {name: value for name, value in hashes.items() if name != "sha256"}
+    _verify_json_fingerprint(
+        "sha256",
+        other_hashes,
+        hashes.get("sha256"),
+        errors,
+    )
+    return errors
+
+
+def _verify_json_fingerprint(
+    name: str,
+    value: object,
+    expected: object,
+    errors: list[str],
+) -> None:
+    """Append an error if one canonical JSON fingerprint is invalid."""
+    try:
+        actual = sha256_json(value)
+    except (TypeError, ValueError):
+        errors.append(f"manifest {name} cannot be fingerprinted as JSON")
+        return
+    verify_digest(name, expected, actual, errors)
+
+
+def verify_digest(
+    name: str,
+    expected: object,
+    actual: str,
+    errors: list[str],
+) -> None:
+    """Append an error if one stored SHA-256 digest is missing or mismatched."""
+    if expected is None:
+        errors.append(f"manifest sha256 is missing the {name} fingerprint")
+        return
+    if not isinstance(expected, str) or not _SHA256_PATTERN.fullmatch(expected):
+        errors.append(f"manifest sha256 has an invalid {name} fingerprint")
+        return
+    if actual != expected:
+        errors.append(f"manifest {name} fingerprint does not match")

@@ -117,7 +117,7 @@ def prepare_object(
             visual_path = staging_directory / "visual.obj"
             visual_mesh.export(visual_path)
             visual_mesh = load_mesh(visual_path)
-            visual_errors = validate_mesh(visual_mesh)
+            visual_errors = validate_mesh(visual_mesh, watertight=True)
             if visual_errors:
                 raise ValueError(
                     f"Published visual mesh is invalid: {'; '.join(visual_errors)}"
@@ -162,6 +162,7 @@ def prepare_object(
             obb=oriented_bounding_box(visual_mesh),
             mass_properties=collision_properties(combined_collision),
             recipe=asdict(recipe),
+            surface=visual_path,
             artifacts=artifacts,
         )
 

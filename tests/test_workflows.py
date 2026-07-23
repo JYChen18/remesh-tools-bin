@@ -66,8 +66,9 @@ class ObjectWorkflowTests(unittest.TestCase):
                 result = prepare_object(source, root / "asset")
 
             manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
-            self.assertEqual(manifest["schema"], "sim-object/v1")
+            self.assertEqual(manifest["schema"], "sim-asset/v2")
             self.assertNotIn("kind", manifest)
+            self.assertEqual(manifest["surfaces"], {"object": "visual.obj"})
             geometry = manifest["geometry"]
             self.assertGreater(geometry["volume"], 0)
             self.assertEqual(len(geometry["center_of_mass"]), 3)
@@ -85,7 +86,8 @@ class ObjectWorkflowTests(unittest.TestCase):
                 {"source.obj", "visual.obj"},
             )
             self.assertTrue(
-                {"schema", "geometry", "recipe", "sha256"} <= manifest["sha256"].keys()
+                {"schema", "geometry", "surfaces", "recipe", "sha256"}
+                <= manifest["sha256"].keys()
             )
             other_hashes = {
                 name: digest
@@ -115,6 +117,14 @@ class ObjectWorkflowTests(unittest.TestCase):
             collision_path.write_bytes(original_collision)
             self.assertEqual(check_object(result.output_directory), [])
 
+            manifest["surfaces"]["object"] = "source.obj"
+            result.manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            self.assertIn(
+                "manifest surfaces fingerprint does not match",
+                check_object(result.output_directory),
+            )
+
+            manifest["surfaces"]["object"] = "visual.obj"
             manifest["geometry"]["volume"] *= 2.0
             result.manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             self.assertIn(
@@ -138,10 +148,11 @@ class ObjectWorkflowTests(unittest.TestCase):
             (root / "asset.json").write_text(
                 json.dumps(
                     {
-                        "schema": "sim-object/v1",
+                        "schema": "sim-asset/v2",
                         "geometry": "invalid",
                         "sha256": {},
                         "recipe": {},
+                        "surfaces": "invalid",
                     }
                 ),
                 encoding="utf-8",
@@ -167,6 +178,7 @@ class BodySurfaceWorkflowTests(unittest.TestCase):
             model_path.write_text(
                 """
                 <mujoco>
+                  <compiler meshdir="mesh-assets"/>
                   <worldbody>
                     <body name="hand/forearm">
                       <freejoint/>
@@ -186,15 +198,72 @@ class BodySurfaceWorkflowTests(unittest.TestCase):
             with mock.patch.object(
                 body_surface_workflow, "prepare_surface", side_effect=copy_source
             ):
-                manifest_path = prepare_body_surfaces(model_path, root / "derived")
+                manifest_path = prepare_body_surfaces(model_path)
 
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            self.assertEqual(manifest["contract"], "body-surfaces/v1")
-            self.assertEqual(set(manifest["bodies"]), {"hand/forearm"})
-            mesh_path = manifest["bodies"]["hand/forearm"]["mesh"]["path"]
-            self.assertNotIn("hand/forearm", mesh_path)
+            self.assertEqual(
+                manifest_path,
+                root / "mesh-assets" / "surfaces" / "asset.json",
+            )
+            self.assertEqual(
+                set(manifest),
+                {"schema", "surfaces", "recipe", "sha256"},
+            )
+            self.assertEqual(manifest["schema"], "sim-asset/v2")
+            self.assertEqual(
+                manifest["surfaces"],
+                {"hand/forearm": "hand%2Fforearm.obj"},
+            )
+            mesh_path = manifest["surfaces"]["hand/forearm"]
+            self.assertNotIn("/", mesh_path)
             self.assertTrue((manifest_path.parent / mesh_path).is_file())
-            self.assertEqual(check_body_surfaces(model_path, manifest_path), [])
+            self.assertIn(mesh_path, manifest["sha256"])
+            self.assertTrue(
+                {"schema", "surfaces", "recipe", "sha256"} <= manifest["sha256"].keys()
+            )
+            self.assertEqual(check_body_surfaces(model_path), [])
+
+            surface_path = manifest_path.parent / mesh_path
+            original_surface = surface_path.read_bytes()
+            surface_path.write_bytes(original_surface + b"\n")
+            self.assertIn(
+                f"artifact hash does not match: {mesh_path}",
+                check_body_surfaces(model_path),
+            )
+            surface_path.write_bytes(original_surface)
+
+            model_path.write_text(
+                model_path.read_text(encoding="utf-8").replace(
+                    'size="0.1 0.1 0.1"',
+                    'size="0.2 0.2 0.2"',
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(check_body_surfaces(model_path), [])
+
+    def test_body_surface_filenames_report_portability_conflicts(self) -> None:
+        from sim_asset_tools.workflows import prepare_body_surfaces
+
+        with tempfile.TemporaryDirectory() as value:
+            root = Path(value)
+            model_path = root / "scene.xml"
+            model_path.write_text(
+                """
+                <mujoco>
+                  <worldbody>
+                    <body name="Body"><geom type="box" size=".1 .1 .1"/></body>
+                    <body name="body"><geom type="box" size=".1 .1 .1"/></body>
+                  </worldbody>
+                </mujoco>
+                """,
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "conflicting surface filenames",
+            ):
+                prepare_body_surfaces(model_path, root / "surfaces")
 
     def test_overwrite_is_atomic_and_removes_stale_body_meshes(self) -> None:
         import trimesh
@@ -268,7 +337,7 @@ class BodySurfaceWorkflowTests(unittest.TestCase):
                     overwrite=True,
                 )
 
-            self.assertEqual(len(list((output_directory / "meshes").glob("*.obj"))), 1)
+            self.assertEqual(len(list(output_directory.glob("*.obj"))), 1)
 
 
 if __name__ == "__main__":

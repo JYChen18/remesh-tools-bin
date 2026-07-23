@@ -83,9 +83,11 @@ sim-assets prepare objects examples/objects \
 Prepare body-local collision surfaces for the right Shadow Hand:
 
 ```bash
-sim-assets prepare body-surfaces examples/models/shadow_hand/scene_right.xml \
-  --output examples/outputs/prepare/body-surfaces
+sim-assets prepare body-surfaces examples/models/shadow_hand/scene_right.xml
 ```
+
+Without `--output`, surfaces are written to `surfaces/` under the model's
+resolved MuJoCo compiler `meshdir`. Pass `--output DIRECTORY` to override it.
 
 ## Validation
 
@@ -98,6 +100,5 @@ sim-assets check object examples/outputs/prepare/object
 Check the prepared Shadow Hand body surfaces:
 
 ```bash
-sim-assets check body-surfaces examples/models/shadow_hand/scene_right.xml \
-  --assets examples/outputs/prepare/body-surfaces
+sim-assets check body-surfaces examples/models/shadow_hand/scene_right.xml
 ```

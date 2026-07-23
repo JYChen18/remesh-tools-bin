@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from sim_asset_tools.formats.manifest import (
-    OBJECT_SCHEMA_VERSION,
+    SCHEMA_VERSION,
     load_manifest,
     resolve_artifact,
     sha256_directory,
@@ -51,7 +51,7 @@ class ManifestFormatTests(unittest.TestCase):
             artifact.write_text("mesh\n", encoding="utf-8")
             manifest_path = root / "asset.json"
             manifest = {
-                "schema": OBJECT_SCHEMA_VERSION,
+                "schema": SCHEMA_VERSION,
                 "sha256": {"meshes/part.obj": sha256_file(artifact)},
             }
 

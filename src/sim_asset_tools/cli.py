@@ -287,7 +287,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "body-surfaces", help="prepare body-local collision surfaces"
     )
     body_surfaces.add_argument("model")
-    body_surfaces.add_argument("--output", required=True)
+    body_surfaces.add_argument(
+        "--output",
+        help="output directory (default: MODEL compiler meshdir/surfaces)",
+    )
     body_surfaces.add_argument("--body", action="append")
     _add_surface_parameters(body_surfaces)
     body_surfaces.add_argument("--overwrite", action="store_true")
@@ -304,7 +307,10 @@ def _build_parser() -> argparse.ArgumentParser:
         "body-surfaces", help="check body-surface assets"
     )
     check_surfaces.add_argument("model")
-    check_surfaces.add_argument("--assets", required=True)
+    check_surfaces.add_argument(
+        "--assets",
+        help="asset manifest or directory (default: MODEL compiler meshdir/surfaces)",
+    )
     check_surfaces.add_argument("--body", action="append")
     check_surfaces.set_defaults(func=_check_body_surfaces)
     return parser

@@ -13,31 +13,35 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Prepare backend-neutral, body-local surface assets from compiled models.
+"""Prepare reusable, body-local surface assets from compiled MuJoCo models.
 
-The ``body-surfaces/v1`` contract keys records by exact compiled body name and
-stores meshes under hash-derived filenames. Body names containing path
-separators therefore remain data rather than becoming filesystem paths.
+New assets use the common ``sim-asset/v2`` manifest. The ``surfaces`` mapping
+keys meshes by exact model-local body name and stores safe, readable filenames
+relative to the manifest.
 """
 
 from __future__ import annotations
 
-import hashlib
-import shutil
+import tempfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from urllib.parse import quote
 
-from .. import __version__
 from ..formats.manifest import (
     MANIFEST_NAME,
     SCHEMA_VERSION,
     load_manifest,
-    relative_artifact_path,
     resolve_artifact,
     sha256_file,
+    sha256_json,
+    verify_manifest_metadata,
+    verify_sha256_map,
     write_manifest,
 )
-from ..formats.mujoco_model import load_mujoco_model
+from ..formats.mujoco_model import (
+    load_mujoco_model,
+    resolve_mujoco_mesh_directory,
+)
 from ..mesh.io import load_mesh
 from ..mesh.validation import validate_mesh
 from .._publish import (
@@ -46,7 +50,7 @@ from .._publish import (
 )
 from ._surface import SurfaceRecipe, prepare_surface
 
-CONTRACT_VERSION = "body-surfaces/v1"
+_RESERVED_SHA256_KEYS = frozenset({"schema", "surfaces", "recipe", "sha256"})
 
 
 @dataclass(frozen=True)
@@ -60,10 +64,9 @@ class BodyPlan:
 
 @dataclass(frozen=True)
 class GeometryPlan:
-    """Bounded, procedural, and unsupported collision bodies."""
+    """Bounded collision bodies and unsupported geometry errors."""
 
     bodies: dict[int, BodyPlan]
-    procedural: dict[int, BodyPlan]
     errors: tuple[str, ...]
 
 
@@ -138,7 +141,6 @@ def analyze_geometry(model) -> GeometryPlan:
         grouped.setdefault(body_id, []).append(geom_id)
 
     bodies: dict[int, BodyPlan] = {}
-    procedural: dict[int, BodyPlan] = {}
     for body_id, geom_ids in grouped.items():
         procedural_ids = [
             geom_id
@@ -146,17 +148,14 @@ def analyze_geometry(model) -> GeometryPlan:
             if int(model.geom_type[geom_id]) in procedural_types
         ]
         name = _body_name(model, body_id)
-        body = BodyPlan(body_id, name, tuple(geom_ids))
         if procedural_ids:
             if len(geom_ids) != 1:
                 errors.append(
                     f"body {name or f'body_{body_id}'!r} mixes a procedural geom with other collisions"
                 )
-            else:
-                procedural[body_id] = body
         else:
-            bodies[body_id] = body
-    return GeometryPlan(bodies, procedural, tuple(errors))
+            bodies[body_id] = BodyPlan(body_id, name, tuple(geom_ids))
+    return GeometryPlan(bodies, tuple(errors))
 
 
 def _rotation_matrix(quaternion):
@@ -250,25 +249,55 @@ def build_body_source_mesh(model, body: BodyPlan):
     )
 
 
-def mesh_fingerprint(mesh) -> str:
-    """Hash canonical float32 vertices and int32 faces."""
-    _, np, _ = _dependencies()
-    digest = hashlib.sha256(CONTRACT_VERSION.encode("ascii"))
-    for label, values in (
-        (b"vertices", np.ascontiguousarray(mesh.vertices, dtype="<f4")),
-        (b"faces", np.ascontiguousarray(mesh.faces, dtype="<i4")),
-    ):
-        digest.update(label)
-        digest.update(np.asarray(values.shape, dtype="<i8").tobytes())
-        digest.update(values.tobytes())
-    return digest.hexdigest()
-
-
 def _filename(body: BodyPlan) -> str:
     if not body.name:
         raise ValueError(f"Body-surface asset body ID {body.body_id} must have a name")
-    token = hashlib.sha256(body.name.encode("utf-8")).hexdigest()[:12]
-    return f"body-{body.body_id:04d}-{token}.obj"
+    encoded = quote(body.name, safe="-_.()@")
+    windows_reserved = {
+        "con",
+        "prn",
+        "aux",
+        "nul",
+        *(f"com{index}" for index in range(1, 10)),
+        *(f"lpt{index}" for index in range(1, 10)),
+    }
+    if encoded.casefold() in windows_reserved:
+        first = encoded[0].encode("ascii")
+        encoded = f"%{first[0]:02X}{encoded[1:]}"
+    filename = f"{encoded}.obj"
+    if len(filename.encode("utf-8")) > 240:
+        raise ValueError(
+            f"Body name is too long for a portable surface filename: {body.name!r}"
+        )
+    return filename
+
+
+def _body_filenames(bodies: list[BodyPlan]) -> dict[int, str]:
+    """Build portable filenames and reject case-insensitive conflicts."""
+    filenames: dict[int, str] = {}
+    owners: dict[str, str] = {}
+    for body in bodies:
+        filename = _filename(body)
+        key = filename.casefold()
+        previous = owners.get(key)
+        if previous is not None and previous != body.name:
+            raise ValueError(
+                "Body names produce conflicting surface filenames: "
+                f"{previous!r} and {body.name!r}"
+            )
+        owners[key] = body.name
+        filenames[body.body_id] = filename
+    return filenames
+
+
+def _output_directory(
+    model_path: Path,
+    output_directory: str | Path | None,
+) -> Path:
+    """Resolve an explicit output or the model compiler meshdir/surfaces."""
+    if output_directory is not None:
+        return Path(output_directory).expanduser().resolve()
+    return resolve_mujoco_mesh_directory(model_path) / "surfaces"
 
 
 def _selected_bodies(plan: GeometryPlan, names: list[str] | None) -> list[BodyPlan]:
@@ -292,7 +321,7 @@ def _selected_bodies(plan: GeometryPlan, names: list[str] | None) -> list[BodyPl
 
 def prepare_body_surfaces(
     model_path: str | Path,
-    output_directory: str | Path,
+    output_directory: str | Path | None = None,
     *,
     recipe: BodySurfaceRecipe | None = None,
     bodies: list[str] | None = None,
@@ -300,7 +329,7 @@ def prepare_body_surfaces(
 ) -> Path:
     """Prepare one body-local surface per bounded collision body."""
     model_path = Path(model_path).expanduser().resolve()
-    output_directory = Path(output_directory).expanduser().resolve()
+    output_directory = _output_directory(model_path, output_directory)
     recipe = recipe or BodySurfaceRecipe()
     model = load_mujoco_model(model_path)
     plan = analyze_geometry(model)
@@ -309,6 +338,7 @@ def prepare_body_surfaces(
             "Body-surface geometry is unsupported:\n" + "\n".join(plan.errors)
         )
     selected = _selected_bodies(plan, bodies)
+    filenames = _body_filenames(selected)
     manifest_path = output_directory / MANIFEST_NAME
     if manifest_path.exists() and not overwrite:
         existing_errors = check_body_surfaces(model_path, manifest_path, bodies=bodies)
@@ -321,126 +351,140 @@ def prepare_body_surfaces(
         )
     ensure_safe_output(model_path, output_directory)
     with staged_directory(output_directory, overwrite=overwrite) as staging_directory:
-        meshes_directory = staging_directory / "meshes"
-        meshes_directory.mkdir()
-        work_directory = staging_directory / ".work"
-        work_directory.mkdir()
-        body_records: dict[str, dict[str, object]] = {}
-        for body in selected:
-            source_mesh = build_body_source_mesh(model, body)
-            filename = _filename(body)
-            source_path = work_directory / f"source-{body.body_id}.obj"
-            generated_path = work_directory / f"generated-{body.body_id}.ply"
-            source_mesh.export(source_path)
-            prepare_surface(
-                source_path,
-                generated_path,
-                work_directory / f"body-{body.body_id}",
-                recipe,
-            )
-            generated_mesh = load_mesh(generated_path)
-            output_path = meshes_directory / filename
-            generated_mesh.export(output_path)
-            published_mesh = load_mesh(output_path)
-            errors = validate_mesh(published_mesh, watertight=True)
-            if errors:
-                raise ValueError(
-                    f"Generated body surface for {body.name!r} is invalid: {'; '.join(errors)}"
+        surfaces: dict[str, str] = {}
+        hashes: dict[str, str] = {}
+        with tempfile.TemporaryDirectory(
+            prefix=".work-",
+            dir=staging_directory,
+        ) as work_value:
+            work_directory = Path(work_value)
+            for body in selected:
+                source_mesh = build_body_source_mesh(model, body)
+                filename = filenames[body.body_id]
+                source_path = work_directory / f"source-{body.body_id}.obj"
+                generated_path = work_directory / f"generated-{body.body_id}.ply"
+                source_mesh.export(source_path)
+                prepare_surface(
+                    source_path,
+                    generated_path,
+                    work_directory / f"body-{body.body_id}",
+                    recipe,
                 )
-            body_records[body.name] = {
-                "body_id": body.body_id,
-                "mesh": {
-                    "path": relative_artifact_path(staging_directory, output_path),
-                    "sha256": sha256_file(output_path),
-                },
-                "source_mesh_sha256": mesh_fingerprint(source_mesh),
-                "asset_mesh_sha256": mesh_fingerprint(published_mesh),
-            }
+                generated_mesh = load_mesh(generated_path)
+                output_path = staging_directory / filename
+                generated_mesh.export(output_path)
+                published_mesh = load_mesh(output_path)
+                errors = validate_mesh(published_mesh, watertight=True)
+                if errors:
+                    raise ValueError(
+                        f"Generated body surface for {body.name!r} is invalid: "
+                        + "; ".join(errors)
+                    )
+                surfaces[body.name] = filename
+                hashes[filename] = sha256_file(output_path)
+
+        recipe_value = asdict(recipe)
+        for name, value in (
+            ("schema", SCHEMA_VERSION),
+            ("surfaces", surfaces),
+            ("recipe", recipe_value),
+        ):
+            hashes[name] = sha256_json(value)
+        hashes["sha256"] = sha256_json(hashes)
         manifest = {
             "schema": SCHEMA_VERSION,
-            "kind": "body-surfaces",
-            "contract": CONTRACT_VERSION,
-            "tool": {"name": "sim-asset-tools", "version": __version__},
-            "source": {
-                "format": "mjb" if model_path.suffix.lower() == ".mjb" else "mjcf",
-                "name": model_path.name,
-                "sha256": sha256_file(model_path),
-            },
-            "recipe": asdict(recipe),
-            "bodies": body_records,
-            "procedural_bodies": [
-                body.name or f"body_{body.body_id}" for body in plan.procedural.values()
-            ],
+            "surfaces": surfaces,
+            "recipe": recipe_value,
+            "sha256": hashes,
         }
-        shutil.rmtree(work_directory)
         write_manifest(staging_directory / MANIFEST_NAME, manifest)
     return manifest_path
 
 
 def check_body_surfaces(
     model_path: str | Path,
-    manifest_path_or_directory: str | Path,
+    manifest_path_or_directory: str | Path | None = None,
     *,
     bodies: list[str] | None = None,
 ) -> list[str]:
     """Check a body-surface manifest against a compiled MuJoCo model."""
-    manifest_path = Path(manifest_path_or_directory)
-    if manifest_path.is_dir():
+    model_path = Path(model_path).expanduser().resolve()
+    if manifest_path_or_directory is None:
+        manifest_path = _output_directory(model_path, None) / MANIFEST_NAME
+    else:
+        manifest_path = Path(manifest_path_or_directory).expanduser().resolve()
+    if manifest_path_or_directory is not None and manifest_path.is_dir():
         manifest_path = manifest_path / MANIFEST_NAME
     manifest = load_manifest(manifest_path)
-    errors: list[str] = []
-    if manifest.get("kind") != "body-surfaces":
-        return [f"manifest kind is not body-surfaces: {manifest.get('kind')!r}"]
-    if manifest.get("contract") != CONTRACT_VERSION:
-        errors.append(
-            f"unsupported body-surface contract: {manifest.get('contract')!r}"
-        )
-    source = manifest.get("source")
-    if not isinstance(source, dict) or source.get("sha256") != sha256_file(model_path):
-        errors.append("source model hash does not match")
     model = load_mujoco_model(model_path)
     plan = analyze_geometry(model)
-    errors.extend(plan.errors)
+    errors = list(plan.errors)
     try:
         selected = _selected_bodies(plan, bodies)
     except ValueError as exc:
         return errors + [str(exc)]
-    records = manifest.get("bodies")
-    if not isinstance(records, dict):
-        return errors + ["manifest bodies must be an object"]
+
+    recipe = manifest.get("recipe")
+    if not isinstance(recipe, dict):
+        errors.append("manifest recipe must be an object")
+    errors.extend(
+        verify_manifest_metadata(
+            manifest,
+            ("schema", "surfaces", "recipe"),
+        )
+    )
+    hashes = manifest.get("sha256")
+    if not isinstance(hashes, dict):
+        return errors
+    artifact_hashes = {
+        path: digest
+        for path, digest in hashes.items()
+        if path not in _RESERVED_SHA256_KEYS
+    }
     root = manifest_path.parent
+    errors.extend(verify_sha256_map(root, artifact_hashes))
+    surfaces = manifest.get("surfaces")
+    if not isinstance(surfaces, dict):
+        return errors + ["manifest surfaces must be an object"]
+
     for body in selected:
-        record = records.get(body.name)
-        if not isinstance(record, dict):
-            errors.append(f"body is missing from manifest: {body.name!r}")
+        relative = surfaces.get(body.name)
+        if not isinstance(relative, str):
+            errors.append(f"body is missing from surfaces: {body.name!r}")
             continue
-        mesh_record = record.get("mesh")
-        if not isinstance(mesh_record, dict) or not isinstance(
-            mesh_record.get("path"), str
-        ):
-            errors.append(f"body mesh record is invalid: {body.name!r}")
+        relative_path = Path(relative)
+        if len(relative_path.parts) != 1 or relative_path.suffix.lower() != ".obj":
+            errors.append(
+                f"body surface path must be a direct .obj filename for {body.name!r}: "
+                f"{relative!r}"
+            )
             continue
         try:
-            path = resolve_artifact(root, mesh_record["path"])
+            path = resolve_artifact(root, relative)
         except ValueError as exc:
             errors.append(str(exc))
             continue
+        if relative not in artifact_hashes:
+            errors.append(
+                f"body surface is not fingerprinted for {body.name!r}: {relative}"
+            )
         if not path.is_file():
-            errors.append(f"body mesh is missing for {body.name!r}: {path}")
+            errors.append(f"body surface is missing for {body.name!r}: {path}")
             continue
-        if mesh_record.get("sha256") != sha256_file(path):
-            errors.append(f"body mesh file hash does not match for {body.name!r}")
-            continue
-        source_mesh = build_body_source_mesh(model, body)
-        if record.get("source_mesh_sha256") != mesh_fingerprint(source_mesh):
-            errors.append(f"compiled collision surface changed for {body.name!r}")
-        try:
-            asset_mesh = load_mesh(path)
-            mesh_errors = validate_mesh(asset_mesh, watertight=True)
-        except ValueError as exc:
-            errors.append(f"could not load body mesh for {body.name!r}: {exc}")
-            continue
-        errors.extend(f"{body.name!r}: {error}" for error in mesh_errors)
-        if record.get("asset_mesh_sha256") != mesh_fingerprint(asset_mesh):
-            errors.append(f"body asset surface hash does not match for {body.name!r}")
+        _validate_body_surface(body.name, path, errors)
     return errors
+
+
+def _validate_body_surface(
+    body_name: str,
+    path: Path,
+    errors: list[str],
+) -> None:
+    """Load one published body mesh and append structural errors."""
+    try:
+        asset_mesh = load_mesh(path)
+        mesh_errors = validate_mesh(asset_mesh, watertight=True)
+    except ValueError as exc:
+        errors.append(f"could not load body mesh for {body_name!r}: {exc}")
+        return
+    errors.extend(f"{body_name!r}: {error}" for error in mesh_errors)
