@@ -284,7 +284,7 @@ def _build_parser() -> argparse.ArgumentParser:
     objects_parser.set_defaults(func=_prepare_objects)
 
     body_surfaces = prepare_commands.add_parser(
-        "body-surfaces", help="prepare body-local collision surfaces"
+        "body-surfaces", help="prepare multi-geom body-local collision surfaces"
     )
     body_surfaces.add_argument("model")
     body_surfaces.add_argument(
@@ -293,7 +293,11 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     body_surfaces.add_argument("--body", action="append")
     _add_surface_parameters(body_surfaces)
-    body_surfaces.add_argument("--overwrite", action="store_true")
+    body_surfaces.add_argument(
+        "--overwrite",
+        action="store_true",
+        help="regenerate this model's set while preserving other model sets",
+    )
     body_surfaces.set_defaults(func=_prepare_body_surfaces)
 
     check = commands.add_parser("check", help="validate prepared assets")
@@ -304,7 +308,7 @@ def _build_parser() -> argparse.ArgumentParser:
     check_object.set_defaults(func=_check_object)
 
     check_surfaces = check_commands.add_parser(
-        "body-surfaces", help="check body-surface assets"
+        "body-surfaces", help="check multi-geom body-surface assets"
     )
     check_surfaces.add_argument("model")
     check_surfaces.add_argument(

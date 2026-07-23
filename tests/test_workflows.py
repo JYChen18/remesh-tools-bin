@@ -185,6 +185,11 @@ class BodySurfaceWorkflowTests(unittest.TestCase):
                       <geom type="box" size="0.1 0.1 0.1"/>
                       <geom type="box" size="0.1 0.1 0.1" pos="0.1 0 0"/>
                     </body>
+                    <body name="object">
+                      <freejoint/>
+                      <geom type="ellipsoid" size="0.1 0.2 0.3"/>
+                    </body>
+                    <geom name="floor" type="plane" size="1 1 0.1"/>
                   </worldbody>
                 </mujoco>
                 """,
@@ -207,13 +212,22 @@ class BodySurfaceWorkflowTests(unittest.TestCase):
             )
             self.assertEqual(
                 set(manifest),
-                {"schema", "surfaces", "recipe", "sha256"},
+                {"schema", "surfaces", "surface_sets", "recipe", "sha256"},
             )
             self.assertEqual(manifest["schema"], "sim-asset/v2")
             self.assertEqual(
                 manifest["surfaces"],
                 {"hand/forearm": "hand%2Fforearm.obj"},
             )
+            self.assertEqual(
+                manifest["surface_sets"]["scene.xml"]["bodies"],
+                ["hand/forearm"],
+            )
+            self.assertRegex(
+                manifest["surface_sets"]["scene.xml"]["source_geometry_sha256"],
+                r"^[0-9a-f]{64}$",
+            )
+            self.assertNotIn("object", manifest["surfaces"])
             mesh_path = manifest["surfaces"]["hand/forearm"]
             self.assertNotIn("/", mesh_path)
             self.assertTrue((manifest_path.parent / mesh_path).is_file())
@@ -221,7 +235,20 @@ class BodySurfaceWorkflowTests(unittest.TestCase):
             self.assertTrue(
                 {"schema", "surfaces", "recipe", "sha256"} <= manifest["sha256"].keys()
             )
+            self.assertNotIn("surface_sets", manifest["sha256"])
             self.assertEqual(check_body_surfaces(model_path), [])
+
+            legacy_manifest = dict(manifest)
+            legacy_manifest.pop("surface_sets")
+            manifest_path.write_text(json.dumps(legacy_manifest), encoding="utf-8")
+            with mock.patch.object(
+                body_surface_workflow,
+                "prepare_surface",
+                side_effect=AssertionError("legacy surface was regenerated"),
+            ):
+                self.assertEqual(prepare_body_surfaces(model_path), manifest_path)
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertIn("scene.xml", manifest["surface_sets"])
 
             surface_path = manifest_path.parent / mesh_path
             original_surface = surface_path.read_bytes()
@@ -232,14 +259,206 @@ class BodySurfaceWorkflowTests(unittest.TestCase):
             )
             surface_path.write_bytes(original_surface)
 
+            physics_xml = model_path.read_text(encoding="utf-8").replace(
+                '<geom type="box" size="0.1 0.1 0.1"/>',
+                '<geom type="box" size="0.1 0.1 0.1" solref="0.01 1"/>',
+                1,
+            )
+            model_path.write_text(physics_xml, encoding="utf-8")
+            self.assertEqual(check_body_surfaces(model_path), [])
+            with mock.patch.object(
+                body_surface_workflow,
+                "prepare_surface",
+                side_effect=AssertionError("physics-only change regenerated surfaces"),
+            ):
+                self.assertEqual(prepare_body_surfaces(model_path), manifest_path)
+
             model_path.write_text(
-                model_path.read_text(encoding="utf-8").replace(
+                physics_xml.replace(
                     'size="0.1 0.1 0.1"',
                     'size="0.2 0.2 0.2"',
                 ),
                 encoding="utf-8",
             )
-            self.assertEqual(check_body_surfaces(model_path), [])
+            self.assertIn(
+                "surface set source geometry fingerprint does not match: 'scene.xml'",
+                check_body_surfaces(model_path),
+            )
+            with self.assertRaisesRegex(
+                FileExistsError,
+                "pass overwrite=True to update it",
+            ):
+                prepare_body_surfaces(model_path)
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "not named multi-geom collision bodies: object",
+            ):
+                prepare_body_surfaces(
+                    model_path,
+                    root / "selected",
+                    bodies=["object"],
+                )
+
+    def test_models_merge_into_one_provider_and_overwrite_only_their_set(self) -> None:
+        from sim_asset_tools.mesh import load_mesh
+        from sim_asset_tools.workflows import (
+            BodySurfaceRecipe,
+            check_body_surfaces,
+            prepare_body_surfaces,
+        )
+        from sim_asset_tools.workflows import body_surfaces as body_surface_workflow
+
+        with tempfile.TemporaryDirectory() as value:
+            root = Path(value)
+            output_directory = root / "mesh-assets" / "surfaces"
+            right_path = root / "scene_right.xml"
+            left_path = root / "scene_left.xml"
+
+            def write_model(path: Path, body_name: str, size: str = ".1") -> None:
+                path.write_text(
+                    f"""
+                    <mujoco>
+                      <compiler meshdir="mesh-assets"/>
+                      <worldbody>
+                        <body name="{body_name}">
+                          <geom type="box" size="{size} {size} {size}"/>
+                          <geom type="box" size="{size} {size} {size}"
+                            pos="{size} 0 0"/>
+                        </body>
+                      </worldbody>
+                    </mujoco>
+                    """,
+                    encoding="utf-8",
+                )
+
+            write_model(right_path, "rh_hand")
+            write_model(left_path, "lh_hand")
+
+            def copy_source(source, output, *_args):
+                load_mesh(source).export(output)
+                return output
+
+            with mock.patch.object(
+                body_surface_workflow,
+                "prepare_surface",
+                side_effect=copy_source,
+            ):
+                manifest_path = prepare_body_surfaces(right_path)
+                self.assertEqual(prepare_body_surfaces(left_path), manifest_path)
+
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(
+                manifest["surfaces"],
+                {
+                    "lh_hand": "lh_hand.obj",
+                    "rh_hand": "rh_hand.obj",
+                },
+            )
+            self.assertEqual(
+                set(manifest["surface_sets"]),
+                {"scene_left.xml", "scene_right.xml"},
+            )
+            self.assertEqual(check_body_surfaces(right_path), [])
+            self.assertEqual(check_body_surfaces(left_path), [])
+
+            with mock.patch.object(
+                body_surface_workflow,
+                "prepare_surface",
+                side_effect=AssertionError("unchanged set was regenerated"),
+            ):
+                self.assertEqual(prepare_body_surfaces(right_path), manifest_path)
+
+            left_bytes = (output_directory / "lh_hand.obj").read_bytes()
+            write_model(right_path, "rh_hand", ".2")
+            self.assertTrue(
+                any(
+                    "surface set source geometry fingerprint does not match" in error
+                    for error in check_body_surfaces(right_path)
+                )
+            )
+            self.assertEqual(check_body_surfaces(left_path), [])
+
+            with self.assertRaisesRegex(
+                FileExistsError,
+                "pass overwrite=True to update it",
+            ):
+                prepare_body_surfaces(right_path)
+
+            with mock.patch.object(
+                body_surface_workflow,
+                "prepare_surface",
+                side_effect=copy_source,
+            ):
+                prepare_body_surfaces(right_path, overwrite=True)
+
+            self.assertEqual(
+                (output_directory / "lh_hand.obj").read_bytes(),
+                left_bytes,
+            )
+            self.assertEqual(check_body_surfaces(right_path), [])
+            self.assertEqual(check_body_surfaces(left_path), [])
+
+            with self.assertRaisesRegex(
+                ValueError,
+                "cannot mix preparation recipes",
+            ):
+                prepare_body_surfaces(
+                    right_path,
+                    recipe=BodySurfaceRecipe(target_vertices=64),
+                    overwrite=True,
+                )
+
+    def test_shared_provider_rejects_different_geometry_for_the_same_body(self) -> None:
+        from sim_asset_tools.mesh import load_mesh
+        from sim_asset_tools.workflows import check_body_surfaces, prepare_body_surfaces
+        from sim_asset_tools.workflows import body_surfaces as body_surface_workflow
+
+        with tempfile.TemporaryDirectory() as value:
+            root = Path(value)
+            output_directory = root / "surfaces"
+            first_path = root / "first.xml"
+            second_path = root / "second.xml"
+            first_path.write_text(
+                """
+                <mujoco>
+                  <worldbody>
+                    <body name="hand">
+                      <geom type="box" size=".1 .1 .1"/>
+                      <geom type="box" size=".1 .1 .1"/>
+                    </body>
+                  </worldbody>
+                </mujoco>
+                """,
+                encoding="utf-8",
+            )
+            second_path.write_text(
+                first_path.read_text(encoding="utf-8").replace(
+                    'size=".1 .1 .1"',
+                    'size=".2 .2 .2"',
+                ),
+                encoding="utf-8",
+            )
+
+            def copy_source(source, output, *_args):
+                load_mesh(source).export(output)
+                return output
+
+            with mock.patch.object(
+                body_surface_workflow,
+                "prepare_surface",
+                side_effect=copy_source,
+            ):
+                manifest_path = prepare_body_surfaces(first_path, output_directory)
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "Body-surface conflict for 'hand'",
+                ):
+                    prepare_body_surfaces(second_path, output_directory)
+
+            self.assertEqual(check_body_surfaces(first_path, manifest_path), [])
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            self.assertEqual(set(manifest["surface_sets"]), {"first.xml"})
 
     def test_body_surface_filenames_report_portability_conflicts(self) -> None:
         from sim_asset_tools.workflows import prepare_body_surfaces
@@ -251,8 +470,14 @@ class BodySurfaceWorkflowTests(unittest.TestCase):
                 """
                 <mujoco>
                   <worldbody>
-                    <body name="Body"><geom type="box" size=".1 .1 .1"/></body>
-                    <body name="body"><geom type="box" size=".1 .1 .1"/></body>
+                    <body name="Body">
+                      <geom type="box" size=".1 .1 .1"/>
+                      <geom type="box" size=".1 .1 .1"/>
+                    </body>
+                    <body name="body">
+                      <geom type="box" size=".1 .1 .1"/>
+                      <geom type="box" size=".1 .1 .1"/>
+                    </body>
                   </worldbody>
                 </mujoco>
                 """,
@@ -264,6 +489,48 @@ class BodySurfaceWorkflowTests(unittest.TestCase):
                 "conflicting surface filenames",
             ):
                 prepare_body_surfaces(model_path, root / "surfaces")
+
+    def test_mixed_plane_or_heightfield_body_is_rejected(self) -> None:
+        from sim_asset_tools.workflows import prepare_body_surfaces
+
+        cases = {
+            "plane": (
+                "",
+                '<geom name="terrain" type="plane" size="1 1 .1"/>',
+            ),
+            "heightfield": (
+                """
+                <asset>
+                  <hfield name="terrain_data" nrow="2" ncol="2"
+                    size="1 1 1 .1" elevation="0 0 0 0"/>
+                </asset>
+                """,
+                '<geom name="terrain" type="hfield" hfield="terrain_data"/>',
+            ),
+        }
+        with tempfile.TemporaryDirectory() as value:
+            root = Path(value)
+            for name, (asset, procedural_geom) in cases.items():
+                with self.subTest(name=name):
+                    model_path = root / f"{name}.xml"
+                    model_path.write_text(
+                        f"""
+                        <mujoco>
+                          {asset}
+                          <worldbody>
+                            {procedural_geom}
+                            <geom name="obstacle" type="box" size=".1 .2 .3"/>
+                          </worldbody>
+                        </mujoco>
+                        """,
+                        encoding="utf-8",
+                    )
+
+                    with self.assertRaisesRegex(
+                        ValueError,
+                        "plane or heightfield must be the only collidable geom",
+                    ):
+                        prepare_body_surfaces(model_path, root / f"{name}-surfaces")
 
     def test_overwrite_is_atomic_and_removes_stale_body_meshes(self) -> None:
         import trimesh
@@ -283,8 +550,16 @@ class BodySurfaceWorkflowTests(unittest.TestCase):
                 """
                 <mujoco>
                   <worldbody>
-                    <body name="one"><freejoint/><geom type="box" size=".1 .1 .1"/></body>
-                    <body name="two"><freejoint/><geom type="box" size=".1 .1 .1"/></body>
+                    <body name="one">
+                      <freejoint/>
+                      <geom type="box" size=".1 .1 .1"/>
+                      <geom type="box" size=".1 .1 .1"/>
+                    </body>
+                    <body name="two">
+                      <freejoint/>
+                      <geom type="box" size=".1 .1 .1"/>
+                      <geom type="box" size=".1 .1 .1"/>
+                    </body>
                   </worldbody>
                 </mujoco>
                 """,

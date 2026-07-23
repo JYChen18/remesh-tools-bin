@@ -21,7 +21,7 @@ x86_64, and macOS 12 or newer on Apple Silicon.
 | --- | --- |
 | `mesh` | Normalize, OpenVDB SDF, ACVD remeshing, CoACD decomposition |
 | `prepare object` / `prepare objects` | GLB, OBJ, PLY, STL to MJCF and/or URDF bundles |
-| `prepare body-surfaces` / `check body-surfaces` | MuJoCo XML, MJCF, or MJB to body-local OBJ surfaces |
+| `prepare body-surfaces` / `check body-surfaces` | MuJoCo XML, MJCF, or MJB to multi-geom body-local OBJ surfaces |
 | `check object` | Object-bundle integrity |
 
 See the [runnable examples](https://github.com/JYChen18/sim-asset-tools/blob/main/examples/README.md)
