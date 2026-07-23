@@ -1,4 +1,16 @@
-"""Read, write, and validate versioned object-bundle manifests."""
+"""Read, write, and validate ``sim-object/v1`` manifests.
+
+Geometry records the source axis-aligned bounds, the processed visual's
+oriented bounds, and mass properties derived from the published collision
+parts. Inertia is stored per unit mass about the recorded center of mass.
+
+The ``sha256`` object maps ordinary artifact paths directly to file digests.
+Reserved entries fingerprint ``schema``, ``geometry``, and ``recipe``; the
+``collision`` entry fingerprints every collision-relative filename and file
+digest; and ``sha256`` fingerprints all other entries in the hash map. Thus
+metadata edits and collision changes, additions, removals, or renames are
+detectable without recomputing geometry.
+"""
 
 from __future__ import annotations
 

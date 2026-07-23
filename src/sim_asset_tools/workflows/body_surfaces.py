@@ -13,7 +13,12 @@
 # limitations under the License.
 # ==============================================================================
 
-"""Prepare backend-neutral, body-local surface assets from compiled models."""
+"""Prepare backend-neutral, body-local surface assets from compiled models.
+
+The ``body-surfaces/v1`` contract keys records by exact compiled body name and
+stores meshes under hash-derived filenames. Body names containing path
+separators therefore remain data rather than becoming filesystem paths.
+"""
 
 from __future__ import annotations
 
@@ -68,14 +73,10 @@ class BodySurfaceRecipe(SurfaceRecipe):
 
 
 def _dependencies():
-    try:
-        import mujoco
-        import numpy as np
-        import trimesh
-    except ImportError as exc:
-        raise RuntimeError(
-            "Body-surface preparation requires sim-asset-tools[mujoco]"
-        ) from exc
+    import mujoco
+    import numpy as np
+    import trimesh
+
     return mujoco, np, trimesh
 
 

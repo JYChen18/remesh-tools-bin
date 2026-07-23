@@ -1,8 +1,8 @@
 # Examples
 
-Run these commands from the repository root after installing
-`sim-asset-tools[all]`. The commands are listed in runnable order, and each
-processing command writes to a separate folder under `examples/outputs/`.
+Run these commands from the repository root after installing `sim-asset-tools`.
+The commands are listed in runnable order, and each processing command writes
+to a separate folder under `examples/outputs/`.
 
 ## Mesh operations
 

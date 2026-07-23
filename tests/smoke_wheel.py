@@ -12,6 +12,7 @@ from sim_asset_tools.native import _native_env, _tool_path, run_native
 
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "tetrahedron.obj"
+MODEL_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "two_boxes.xml"
 EXPECTED_NATIVE_TOOLS = {
     "ACVD",
     "ACVDP",
@@ -207,8 +208,29 @@ def run_volume_analysis(temporary_path: Path) -> None:
     require_output(temporary_path / "meshes.xml")
 
 
+def run_coacd(temporary_path: Path) -> None:
+    output_directory = temporary_path / "coacd"
+    result = sim_assets_main(["mesh", "coacd", str(FIXTURE), str(output_directory)])
+    if result != 0:
+        raise RuntimeError(f"CoACD smoke test failed with exit code {result}")
+    parts = sorted(output_directory.glob("part_*.obj"))
+    if not parts:
+        raise RuntimeError("CoACD smoke test did not produce collision parts")
+    for part in parts:
+        require_output(part)
+
+
+def run_mujoco_model_loading() -> None:
+    from sim_asset_tools.formats.mujoco_model import load_mujoco_model
+
+    model = load_mujoco_model(MODEL_FIXTURE)
+    if model.nbody != 2 or model.ngeom != 2:
+        raise RuntimeError("MuJoCo smoke test loaded an unexpected model")
+
+
 def run() -> None:
     verify_installed_tools()
+    run_mujoco_model_loading()
     with tempfile.TemporaryDirectory() as temporary_directory:
         temporary_path = Path(temporary_directory)
         openvdb_output = temporary_path / "openvdb.obj"
@@ -229,6 +251,7 @@ def run() -> None:
             )
         require_output(openvdb_output)
         run_acvd_cases(temporary_path)
+        run_coacd(temporary_path)
         run_volume_analysis(temporary_path)
 
 

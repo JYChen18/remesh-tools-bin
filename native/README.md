@@ -18,6 +18,17 @@ contents there.
 The repository root `CMakeLists.txt` intentionally remains a small facade so
 both scikit-build-core and direct `cmake -S .` builds use this subsystem.
 
+## Building from source
+
+From the repository root:
+
+```bash
+uv sync
+uv build --wheel
+```
+
+## Updating native dependencies
+
 When updating a native dependency, keep its version, source declaration,
 license entry, and wheel smoke coverage in sync. Validate changes by building a
 wheel from the source distribution and running `tests/smoke_wheel.py` from an

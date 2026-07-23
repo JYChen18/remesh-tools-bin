@@ -66,9 +66,6 @@ jobs:
           - name: Windows x86_64
             os: windows-latest
             artifact: windows-x86_64
-          - name: macOS Intel
-            os: macos-15-intel
-            artifact: macos-x86_64
           - name: macOS Apple Silicon
             os: macos-latest
             artifact: macos-arm64
@@ -132,9 +129,6 @@ jobs:
           - name: Windows x86_64
             os: windows-latest
             artifact: windows-x86_64
-          - name: macOS Intel
-            os: macos-15-intel
-            artifact: macos-x86_64
           - name: macOS Apple Silicon
             os: macos-latest
             artifact: macos-arm64
@@ -160,7 +154,7 @@ jobs:
       - name: Verify installed dependencies
         run: python -m pip check
 
-      - name: Run native smoke tests
+      - name: Run wheel smoke tests
         run: python tests/smoke_wheel.py
 
   test-linux-minimal:
@@ -201,7 +195,7 @@ jobs:
       - name: Verify installed dependencies
         run: python -m pip check
 
-      - name: Run all native tools
+      - name: Run wheel smoke tests
         run: python tests/smoke_wheel.py
 
   publish-pypi:

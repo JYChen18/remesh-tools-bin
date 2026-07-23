@@ -1,4 +1,11 @@
-"""Versioned manifests shared by prepared simulation assets."""
+"""Common manifest primitives for portable, verifiable asset bundles.
+
+Manifest schemas are explicit and versioned. Artifact paths are POSIX-style,
+relative to the bundle root, and must not escape it. JSON fingerprints use a
+deterministic UTF-8 encoding with sorted keys, compact separators, and no NaN;
+directory fingerprints cover every relative filename and file digest. Callers
+finish referenced artifacts before atomically replacing ``asset.json``.
+"""
 
 from __future__ import annotations
 

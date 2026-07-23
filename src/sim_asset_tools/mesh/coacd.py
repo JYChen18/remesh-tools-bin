@@ -28,13 +28,9 @@ def decompose_mesh(
     seed: int | None = 0,
 ) -> list:
     """Decompose a triangle mesh into approximately convex parts."""
-    try:
-        import coacd
-        import numpy as np
-    except ImportError as exc:
-        raise RuntimeError(
-            "Convex decomposition requires sim-asset-tools[coacd]"
-        ) from exc
+    import coacd
+    import numpy as np
+
     coacd_mesh = coacd.Mesh(
         np.asarray(mesh.vertices, dtype=np.float64),
         np.asarray(mesh.faces, dtype=np.int32),

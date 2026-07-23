@@ -9,9 +9,8 @@ from unittest import mock
 
 _HAS_MESH_DEPS = all(
     importlib.util.find_spec(name) is not None
-    for name in ("numpy", "trimesh", "vtkmodules")
+    for name in ("coacd", "numpy", "trimesh", "vtkmodules")
 )
-_HAS_COACD = importlib.util.find_spec("coacd") is not None
 _HAS_MODEL_DEPS = _HAS_MESH_DEPS and importlib.util.find_spec("mujoco") is not None
 
 
@@ -44,7 +43,6 @@ class ObjectWorkflowTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "share output directories"):
                 prepare_objects(root, root / "output")
 
-    @unittest.skipUnless(_HAS_COACD, "requires sim-asset-tools[coacd]")
     def test_prepare_object_writes_a_valid_versioned_bundle(self) -> None:
         import trimesh
 
@@ -156,7 +154,7 @@ class ObjectWorkflowTests(unittest.TestCase):
             self.assertEqual(cli.main(["check", "object", str(root)]), 1)
 
 
-@unittest.skipUnless(_HAS_MODEL_DEPS, "requires sim-asset-tools[mujoco]")
+@unittest.skipUnless(_HAS_MODEL_DEPS, "requires MuJoCo and mesh dependencies")
 class BodySurfaceWorkflowTests(unittest.TestCase):
     def test_manifest_maps_model_body_names_to_portable_paths(self) -> None:
         from sim_asset_tools.mesh import load_mesh

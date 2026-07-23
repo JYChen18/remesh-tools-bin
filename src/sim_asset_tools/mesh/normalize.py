@@ -4,7 +4,11 @@ from __future__ import annotations
 
 
 def normalize_mesh(mesh):
-    """Center a mesh and scale its bounding-box half-diagonal to one."""
+    """Center a mesh and scale its axis-aligned bounding-box half-diagonal to one.
+
+    For source center ``c`` and full extents ``e``, transformed vertices are
+    ``2 * (vertices - c) / norm(e)``.
+    """
     try:
         import numpy as np
     except ImportError as exc:
