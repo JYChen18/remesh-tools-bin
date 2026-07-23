@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 
 from ..mesh.acvd import acvd_remesh
@@ -18,10 +18,6 @@ class SurfaceRecipe:
     target_vertices: int = 1024
     gradation: float = 1.5
     force_manifold: int = 1
-
-    def to_manifest(self) -> dict[str, object]:
-        return asdict(self)
-
 
 def prepare_surface(
     input_path: str | Path,

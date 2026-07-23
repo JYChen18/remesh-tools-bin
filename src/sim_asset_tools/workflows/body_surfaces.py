@@ -36,15 +36,12 @@ from ..formats.mujoco_model import load_mujoco_model
 from ..mesh.io import load_mesh
 from ..mesh.validation import validate_mesh
 from .._publish import (
-    create_staging_directory,
-    ensure_output_available,
     ensure_safe_output,
-    publish_directory,
+    staged_directory,
 )
 from ._surface import SurfaceRecipe, prepare_surface
 
 CONTRACT_VERSION = "body-surfaces/v1"
-FINGERPRINT_FORMAT = CONTRACT_VERSION
 
 
 @dataclass(frozen=True)
@@ -54,10 +51,6 @@ class BodyPlan:
     body_id: int
     name: str
     geom_ids: tuple[int, ...]
-
-    @property
-    def is_multi_geom(self) -> bool:
-        return len(self.geom_ids) > 1
 
 
 @dataclass(frozen=True)
@@ -70,24 +63,8 @@ class GeometryPlan:
 
 
 @dataclass(frozen=True)
-class BodySurfaceRecipe:
+class BodySurfaceRecipe(SurfaceRecipe):
     """Parameters for body-surface preparation."""
-
-    resolution: float = 50.0
-    level_set: float = 0.1
-    target_vertices: int = 1024
-    gradation: float = 1.5
-    force_manifold: int = 1
-
-    @property
-    def surface(self) -> SurfaceRecipe:
-        return SurfaceRecipe(
-            resolution=self.resolution,
-            level_set=self.level_set,
-            target_vertices=self.target_vertices,
-            gradation=self.gradation,
-            force_manifold=self.force_manifold,
-        )
 
 
 def _dependencies():
@@ -275,7 +252,7 @@ def build_body_source_mesh(model, body: BodyPlan):
 def mesh_fingerprint(mesh) -> str:
     """Hash canonical float32 vertices and int32 faces."""
     _, np, _ = _dependencies()
-    digest = hashlib.sha256(FINGERPRINT_FORMAT.encode("ascii"))
+    digest = hashlib.sha256(CONTRACT_VERSION.encode("ascii"))
     for label, values in (
         (b"vertices", np.ascontiguousarray(mesh.vertices, dtype="<f4")),
         (b"faces", np.ascontiguousarray(mesh.faces, dtype="<i4")),
@@ -319,7 +296,6 @@ def prepare_body_surfaces(
     recipe: BodySurfaceRecipe | None = None,
     bodies: list[str] | None = None,
     overwrite: bool = False,
-    keep_work: bool = False,
 ) -> Path:
     """Prepare one body-local surface per bounded collision body."""
     model_path = Path(model_path).expanduser().resolve()
@@ -343,13 +319,11 @@ def prepare_body_surfaces(
             "pass overwrite=True to replace it"
         )
     ensure_safe_output(model_path, output_directory)
-    ensure_output_available(output_directory, overwrite=overwrite)
-    staging_directory = create_staging_directory(output_directory)
-    meshes_directory = staging_directory / "meshes"
-    meshes_directory.mkdir()
-    work_directory = staging_directory / ".work"
-    work_directory.mkdir()
-    try:
+    with staged_directory(output_directory, overwrite=overwrite) as staging_directory:
+        meshes_directory = staging_directory / "meshes"
+        meshes_directory.mkdir()
+        work_directory = staging_directory / ".work"
+        work_directory.mkdir()
         body_records: dict[str, dict[str, object]] = {}
         for body in selected:
             source_mesh = build_body_source_mesh(model, body)
@@ -361,19 +335,17 @@ def prepare_body_surfaces(
                 source_path,
                 generated_path,
                 work_directory / f"body-{body.body_id}",
-                recipe.surface,
+                recipe,
             )
             generated_mesh = load_mesh(generated_path)
-            errors = validate_mesh(generated_mesh, watertight=True)
+            output_path = meshes_directory / filename
+            generated_mesh.export(output_path)
+            published_mesh = load_mesh(output_path)
+            errors = validate_mesh(published_mesh, watertight=True)
             if errors:
                 raise ValueError(
                     f"Generated body surface for {body.name!r} is invalid: {'; '.join(errors)}"
                 )
-            staged_path = work_directory / filename
-            generated_mesh.export(staged_path)
-            published_mesh = load_mesh(staged_path)
-            output_path = meshes_directory / filename
-            shutil.move(staged_path, output_path)
             body_records[body.name] = {
                 "body_id": body.body_id,
                 "mesh": {
@@ -399,19 +371,9 @@ def prepare_body_surfaces(
                 body.name or f"body_{body.body_id}" for body in plan.procedural.values()
             ],
         }
-        if not keep_work:
-            shutil.rmtree(work_directory)
+        shutil.rmtree(work_directory)
         write_manifest(staging_directory / MANIFEST_NAME, manifest)
-        publish_directory(
-            staging_directory,
-            output_directory,
-            overwrite=overwrite,
-        )
-        return manifest_path
-    except BaseException:
-        if staging_directory.exists() and not keep_work:
-            shutil.rmtree(staging_directory)
-        raise
+    return manifest_path
 
 
 def check_body_surfaces(

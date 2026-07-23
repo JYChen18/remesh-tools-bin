@@ -6,7 +6,9 @@ import os
 import shutil
 import tempfile
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 
 def ensure_safe_output(input_path: Path, output_directory: Path) -> None:
@@ -71,3 +73,24 @@ def publish_directory(
         raise
 
     shutil.rmtree(backup_directory)
+
+
+@contextmanager
+def staged_directory(
+    output_directory: Path,
+    *,
+    overwrite: bool,
+) -> Iterator[Path]:
+    """Yield a staging directory, then publish it or clean it up."""
+    ensure_output_available(output_directory, overwrite=overwrite)
+    staging_directory = create_staging_directory(output_directory)
+    try:
+        yield staging_directory
+        publish_directory(
+            staging_directory,
+            output_directory,
+            overwrite=overwrite,
+        )
+    finally:
+        if staging_directory.exists():
+            shutil.rmtree(staging_directory)

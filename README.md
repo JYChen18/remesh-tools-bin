@@ -63,17 +63,27 @@ Each object is self-describing:
 ```text
 cup/
 ├── asset.json
-├── source/
-├── visual/mesh.obj
-├── collision/coacd/part_000.obj
-└── models/
-    ├── model.xml
-    └── model.urdf
+├── source.glb
+├── visual.obj
+├── collision/
+│   └── part_000.obj
+├── model.xml
+└── model.urdf
 ```
 
 The pipeline normalizes the source mesh, runs OpenVDB and ACVD, decomposes the
-result with CoACD, and records the transform, recipes, hashes, and collision
-mass properties in `asset.json`.
+result with CoACD, and records the recipe, artifact hashes, and canonical
+geometry information in `asset.json`.
+
+`source_aabb_center` and the full `source_aabb_extents` are measured on the
+input mesh. When `recipe.normalize` is true, processed coordinates are
+`2 * (source - source_aabb_center) / norm(source_aabb_extents)`.
+`obb_center`, `obb_axes`, and the full `obb_extents` describe the processed
+visual surface. `volume`, `center_of_mass`, and `inertia_per_unit_mass` are
+computed from the published collision parts so that they match simulation mass
+and density behavior. The inertia assumes uniform density, is measured about
+`center_of_mass`, and converts to physical inertia by multiplying by the chosen
+mass.
 
 ## Body surfaces
 
@@ -89,15 +99,24 @@ sim-assets check body-surfaces scene.xml \
 ```
 
 The `body-surfaces/v1` manifest maps exact model body names to hashed filenames,
-which supports names containing separators such as `hand/forearm`. Consumers
-validate the source and generated mesh hashes before using the surfaces.
+which supports names containing separators such as `hand/forearm`. Run
+`sim-assets check body-surfaces` to validate the source and generated mesh
+hashes before using the surfaces.
 
 ## Manifest compatibility
 
-All generated bundles use schema `sim-asset/v1`. Body-surface guarantees are
-versioned separately as `body-surfaces/v1`. Artifact paths are relative to the
-manifest, and the manifest is published only after all referenced files are
-complete.
+Object bundles use schema `sim-object/v1`. Their `sha256` object maps each
+non-collision artifact path directly to its digest. The reserved `collision`
+entry fingerprints a canonical map from every collision-relative filename to
+its file digest, so changing, adding, removing, or renaming any part invalidates
+the collision set as one unit. The reserved keys `schema`, `geometry`, and
+`recipe` fingerprint the corresponding top-level values, while `sha256`
+fingerprints every other entry in the `sha256` object. JSON fingerprints use
+UTF-8 JSON with sorted keys and compact separators. This catches accidental
+metadata edits without loading and recomputing the geometry. Body-surface
+bundles continue to use the `sim-asset/v1` envelope and the separately
+versioned `body-surfaces/v1` contract. Every manifest is published only after
+its referenced files are complete.
 
 ## Third-party software
 

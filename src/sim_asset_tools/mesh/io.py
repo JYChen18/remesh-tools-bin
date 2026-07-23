@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+SUPPORTED_MESH_SUFFIXES = frozenset({".glb", ".obj", ".ply", ".stl"})
+
 
 def _trimesh():
     try:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import shutil
 import sys
 from pathlib import Path
 from typing import Sequence
@@ -122,18 +121,14 @@ def _mesh_coacd(args: argparse.Namespace) -> int:
     from .mesh.coacd import decompose_mesh
     from .mesh.io import load_mesh
     from ._publish import (
-        create_staging_directory,
-        ensure_output_available,
         ensure_safe_output,
-        publish_directory,
+        staged_directory,
     )
 
     input_path = Path(args.input).expanduser().resolve()
     output = Path(args.output).expanduser().resolve()
     ensure_safe_output(input_path, output)
-    ensure_output_available(output, overwrite=args.overwrite)
-    staging_directory = create_staging_directory(output)
-    try:
+    with staged_directory(output, overwrite=args.overwrite) as staging_directory:
         parts = decompose_mesh(
             load_mesh(input_path),
             threshold=args.threshold,
@@ -147,11 +142,6 @@ def _mesh_coacd(args: argparse.Namespace) -> int:
             raise RuntimeError("CoACD did not produce any collision parts")
         for index, part in enumerate(parts):
             part.export(staging_directory / f"part_{index:03d}.obj")
-        publish_directory(staging_directory, output, overwrite=args.overwrite)
-    except BaseException:
-        if staging_directory.exists():
-            shutil.rmtree(staging_directory)
-        raise
     print(f"wrote {len(parts)} parts to {output}")
     return 0
 
@@ -195,7 +185,6 @@ def _prepare_body_surfaces(args: argparse.Namespace) -> int:
         recipe=_body_surface_recipe(args),
         bodies=args.body,
         overwrite=args.overwrite,
-        keep_work=args.keep_work,
     )
     print(path)
     return 0
@@ -302,7 +291,6 @@ def _build_parser() -> argparse.ArgumentParser:
     body_surfaces.add_argument("--body", action="append")
     _add_surface_parameters(body_surfaces)
     body_surfaces.add_argument("--overwrite", action="store_true")
-    body_surfaces.add_argument("--keep-work", action="store_true")
     body_surfaces.set_defaults(func=_prepare_body_surfaces)
 
     check = commands.add_parser("check", help="validate prepared assets")

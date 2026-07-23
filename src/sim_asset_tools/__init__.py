@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
-from .formats.manifest import MANIFEST_NAME, SCHEMA_VERSION, load_manifest
+from .formats.manifest import (
+    MANIFEST_NAME,
+    OBJECT_SCHEMA_VERSION,
+    SCHEMA_VERSION,
+    load_manifest,
+)
 from .native import native_bin_dir, run_native
 
 __all__ = [
     "MANIFEST_NAME",
+    "OBJECT_SCHEMA_VERSION",
     "SCHEMA_VERSION",
     "load_manifest",
     "native_bin_dir",

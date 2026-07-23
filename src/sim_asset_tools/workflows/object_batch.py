@@ -6,16 +6,8 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from .object import (
-    SUPPORTED_INPUT_SUFFIXES,
-    ObjectRecipe,
-    ObjectResult,
-    prepare_object,
-)
-
-
-def _prepare_job(args):
-    return prepare_object(*args[0], **args[1])
+from ..mesh.io import SUPPORTED_MESH_SUFFIXES
+from .object import ObjectRecipe, ObjectResult, prepare_object
 
 
 def prepare_objects(
@@ -35,7 +27,7 @@ def prepare_objects(
     inputs = sorted(
         path
         for path in input_directory.iterdir()
-        if path.is_file() and path.suffix.lower() in SUPPORTED_INPUT_SUFFIXES
+        if path.is_file() and path.suffix.lower() in SUPPORTED_MESH_SUFFIXES
     )
     if not inputs:
         raise ValueError(f"No supported mesh files found in {input_directory}")
@@ -47,20 +39,23 @@ def prepare_objects(
         )
     if jobs <= 0:
         raise ValueError("jobs must be positive")
-    work = [
-        (
-            (path, output_directory / path.stem),
-            {"recipe": recipe, "formats": formats, "overwrite": overwrite},
+
+    def prepare(path: Path) -> ObjectResult:
+        return prepare_object(
+            path,
+            output_directory / path.stem,
+            recipe=recipe,
+            formats=formats,
+            overwrite=overwrite,
         )
-        for path in inputs
-    ]
+
     if jobs == 1:
-        return [_prepare_job(item) for item in work]
+        return [prepare(path) for path in inputs]
 
     results: dict[Path, ObjectResult] = {}
     failures: list[str] = []
     with ThreadPoolExecutor(max_workers=jobs) as executor:
-        futures = {executor.submit(_prepare_job, item): item[0][0] for item in work}
+        futures = {executor.submit(prepare, path): path for path in inputs}
         for future in as_completed(futures):
             source = futures[future]
             try:
