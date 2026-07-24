@@ -81,9 +81,7 @@ class NativeBuildSupportTests(unittest.TestCase):
 
         for sys_platform, machine, expected in cases:
             with self.subTest(platform=sys_platform, machine=machine):
-                self.assertEqual(
-                    self.sdk_archive_name(sys_platform, machine), expected
-                )
+                self.assertEqual(self.sdk_archive_name(sys_platform, machine), expected)
 
     def test_rejects_unsupported_vtk_sdk_targets(self) -> None:
         with (
@@ -175,9 +173,9 @@ class OpenVdbPatchTests(unittest.TestCase):
         node_manager = (self.openvdb_dir / "tree" / "NodeManager.h").read_text(
             encoding="utf-8"
         )
-        point_index_grid = (
-            self.openvdb_dir / "tools" / "PointIndexGrid.h"
-        ).read_text(encoding="utf-8")
+        point_index_grid = (self.openvdb_dir / "tools" / "PointIndexGrid.h").read_text(
+            encoding="utf-8"
+        )
         self.assertEqual(node_manager.count("OpT::eval"), 3)
         self.assertNotIn("OpT::template eval", node_manager)
         self.assertIn("BaseLeaf::template merge<Policy>(rhs);", point_index_grid)

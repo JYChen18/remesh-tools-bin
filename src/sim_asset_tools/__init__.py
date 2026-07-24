@@ -4,17 +4,17 @@ from __future__ import annotations
 
 from .formats.manifest import (
     MANIFEST_NAME,
-    SCHEMA_VERSION,
     load_manifest,
 )
+from .formats.object_manifest import OBJECT_MANIFEST_SCHEMA
 from .native import native_bin_dir, run_native
 
 __all__ = [
     "MANIFEST_NAME",
-    "SCHEMA_VERSION",
+    "OBJECT_MANIFEST_SCHEMA",
     "load_manifest",
     "native_bin_dir",
     "run_native",
 ]
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

@@ -1,12 +1,12 @@
-"""Shared OpenVDB-to-ACVD workflow plumbing."""
+"""Generic OpenVDB-to-ACVD surface-generation primitives."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
 
-from ..mesh.acvd import acvd_remesh
-from ..mesh.openvdb import openvdb_sdf
+from .mesh.acvd import acvd_remesh
+from .mesh.openvdb import openvdb_sdf
 
 
 @dataclass(frozen=True)
@@ -18,6 +18,7 @@ class SurfaceRecipe:
     target_vertices: int = 1024
     gradation: float = 1.5
     force_manifold: int = 1
+
 
 def prepare_surface(
     input_path: str | Path,

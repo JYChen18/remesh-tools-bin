@@ -16,8 +16,8 @@ from ..mesh.io import SUPPORTED_MESH_SUFFIXES, load_mesh
 from ..mesh.normalize import normalize_mesh
 from ..mesh.properties import collision_properties, oriented_bounding_box
 from ..mesh.validation import validate_mesh
-from .._publish import ensure_safe_output, staged_directory
-from ._surface import SurfaceRecipe, prepare_surface
+from ..publish import ensure_safe_output, staged_directory
+from ..surface import SurfaceRecipe, prepare_surface
 
 
 @dataclass(frozen=True)

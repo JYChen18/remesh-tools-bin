@@ -1,10 +1,11 @@
-"""Common manifest primitives for portable, verifiable asset bundles.
+"""Schema-neutral primitives for portable, verifiable asset manifests.
 
-Manifest schemas are explicit and versioned. Artifact paths are POSIX-style,
-relative to the bundle root, and must not escape it. JSON fingerprints use a
-deterministic UTF-8 encoding with sorted keys, compact separators, and no NaN;
-directory fingerprints cover every relative filename and file digest. Callers
-finish referenced artifacts before atomically replacing ``asset.json``.
+Artifact paths are POSIX-style, relative to the bundle root, and must not
+escape it. JSON fingerprints use a deterministic UTF-8 encoding with sorted
+keys, compact separators, and no NaN; directory fingerprints cover every
+relative filename and file digest. Consumer workflows own and validate their
+schemas before using these helpers. Callers finish referenced artifacts before
+atomically replacing ``asset.json``.
 """
 
 from __future__ import annotations
@@ -14,10 +15,9 @@ import json
 import os
 import re
 import tempfile
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
-SCHEMA_VERSION = "sim-asset/v2"
 MANIFEST_NAME = "asset.json"
 
 _SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
@@ -47,13 +47,17 @@ def sha256_json(value: object) -> str:
 def sha256_directory(path: str | os.PathLike[str]) -> str:
     """Fingerprint a directory's filenames and file contents."""
     root = Path(path)
+    if root.is_symlink():
+        raise ValueError(f"Artifact directory must not be a symbolic link: {root}")
     if not root.is_dir():
         raise ValueError(f"Artifact directory does not exist: {root}")
-    hashes = {
-        artifact.relative_to(root).as_posix(): sha256_file(artifact)
-        for artifact in root.rglob("*")
-        if artifact.is_file()
-    }
+    hashes: dict[str, str] = {}
+    for artifact in root.rglob("*"):
+        relative = artifact.relative_to(root).as_posix()
+        if artifact.is_symlink():
+            raise ValueError(f"Artifact directory contains a symbolic link: {relative}")
+        if artifact.is_file():
+            hashes[relative] = sha256_file(artifact)
     return sha256_json(hashes)
 
 
@@ -68,12 +72,30 @@ def relative_artifact_path(root: Path, path: Path) -> str:
 
 def resolve_artifact(root: Path, value: str) -> Path:
     """Resolve a manifest-relative artifact path without allowing traversal."""
-    relative = Path(value)
-    if relative.is_absolute() or ".." in relative.parts:
+    if "\\" in value:
+        raise ValueError(f"Manifest artifact path must use POSIX separators: {value!r}")
+    posix_path = PurePosixPath(value)
+    windows_path = PureWindowsPath(value)
+    if (
+        posix_path.is_absolute()
+        or windows_path.is_absolute()
+        or bool(windows_path.drive)
+        or ".." in posix_path.parts
+        or ".." in windows_path.parts
+    ):
         raise ValueError(
             f"Manifest artifact path must be relative and contained: {value!r}"
         )
-    path = (root / relative).resolve()
+    relative = Path(value)
+    unresolved = root / relative
+    cursor = root
+    for part in relative.parts:
+        cursor /= part
+        if cursor.is_symlink():
+            raise ValueError(
+                f"Manifest artifact path must not traverse symbolic links: {value!r}"
+            )
+    path = unresolved.resolve()
     try:
         path.relative_to(root.resolve())
     except ValueError as exc:
@@ -82,33 +104,31 @@ def resolve_artifact(root: Path, value: str) -> Path:
 
 
 def load_manifest(path_or_directory: str | os.PathLike[str]) -> dict[str, Any]:
-    """Load and minimally validate an asset manifest."""
+    """Load a manifest JSON object without imposing a consumer schema."""
     path = Path(path_or_directory)
     if path.is_dir():
         path = path / MANIFEST_NAME
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
+        value = json.loads(
+            path.read_text(encoding="utf-8"),
+            parse_constant=_reject_nonfinite_json,
+        )
     except FileNotFoundError as exc:
         raise ValueError(f"Asset manifest does not exist: {path}") from exc
-    except (OSError, json.JSONDecodeError) as exc:
+    except (OSError, ValueError) as exc:
         raise ValueError(f"Could not read asset manifest {path}: {exc}") from exc
     if not isinstance(value, dict):
         raise ValueError(f"Asset manifest must contain a JSON object: {path}")
-    schema = value.get("schema")
-    if schema != SCHEMA_VERSION:
-        raise ValueError(
-            f"Unsupported asset manifest schema {schema!r}; expected {SCHEMA_VERSION!r}"
-        )
     return value
 
 
 def write_manifest(path: str | os.PathLike[str], value: dict[str, Any]) -> None:
-    """Atomically publish a manifest after all referenced artifacts are ready."""
+    """Atomically publish a manifest JSON object."""
+    if not isinstance(value, dict):
+        raise TypeError("Asset manifest must be a JSON object")
     path = Path(path)
-    if value.get("schema") != SCHEMA_VERSION:
-        raise ValueError(f"Manifest schema must be {SCHEMA_VERSION!r}")
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = json.dumps(value, indent=2, sort_keys=True) + "\n"
+    payload = json.dumps(value, allow_nan=False, indent=2, sort_keys=True) + "\n"
     descriptor, temporary_name = tempfile.mkstemp(
         prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
     )
@@ -122,6 +142,11 @@ def write_manifest(path: str | os.PathLike[str], value: dict[str, Any]) -> None:
     finally:
         if temporary.exists():
             temporary.unlink()
+
+
+def _reject_nonfinite_json(value: str) -> None:
+    """Reject JavaScript-style non-finite constants accepted by ``json``."""
+    raise ValueError(f"non-finite JSON number: {value}")
 
 
 def verify_sha256_map(root: Path, value: object) -> list[str]:
