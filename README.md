@@ -26,15 +26,6 @@ x86_64, and macOS 12 or newer on Apple Silicon.
 See the [runnable examples](https://github.com/JYChen18/sim-asset-tools/blob/main/examples/README.md)
 for CLI commands and `uv run sim-assets --help` for all available options.
 
-## Reusable workflow primitives
-
-Higher-level asset packages can build on the public
-`sim_asset_tools.surface` module for OpenVDB-to-ACVD surface generation and
-`sim_asset_tools.publish` for atomic directory publication. Manifest JSON,
-path, and hashing helpers in `sim_asset_tools.formats.manifest` are
-schema-neutral; each workflow owns and validates its persistent format.
-Prepared object bundles use the `sim-asset/object/v1` schema.
-
 ## Third-party software
 
 | Component | Version or source | Use | License |
