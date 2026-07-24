@@ -17,6 +17,23 @@ BASE_URL = "https://vtk.org/files/wheel-sdks/vtk-sdk"
 SUPPORTED_VERSION = "9.6.2"
 MINIMUM_PYTHON = (3, 10)
 MAXIMUM_PYTHON = (3, 13)
+CHARCONV_COMPATIBILITY_MARKER = (
+    "sim-asset-tools: evaluate charconv support in the consumer toolchain"
+)
+CHARCONV_COMPATIBILITY_PATCH = f"""
+
+// {CHARCONV_COMPATIBILITY_MARKER}
+// The wheel SDK records the feature checks from the toolchain that built VTK.
+// Re-enable VTK's compatibility definitions when this SDK is consumed with an
+// older standard library or compiler.
+#include <version>
+#if (defined(_GLIBCXX_RELEASE) && _GLIBCXX_RELEASE <= 9) || \\
+  (defined(_LIBCPP_VERSION) && defined(__clang__) && __clang_major__ <= 10)
+#undef VTK_HAS_STD_CHARS_FORMAT
+#undef VTK_HAS_STD_FROM_CHARS_RESULT
+#undef VTK_HAS_STD_TO_CHARS_RESULT
+#endif
+"""
 
 
 def _cpython_tag() -> str:
@@ -133,6 +150,28 @@ def _find_vtk_dir(root: Path) -> Path:
     return (preferred or candidates)[0].parent
 
 
+def _patch_charconv_compatibility(root: Path) -> None:
+    headers = sorted(root.rglob("vtkCharConvCompatibility.h"))
+    if not headers:
+        raise RuntimeError(
+            f"Could not find vtkCharConvCompatibility.h under VTK SDK {root}"
+        )
+
+    needle = "#define VTK_HAS_STD_TO_CHARS_RESULT\n"
+    for header in headers:
+        content = header.read_text(encoding="utf-8")
+        if CHARCONV_COMPATIBILITY_MARKER in content:
+            continue
+        if content.count(needle) != 1:
+            raise RuntimeError(
+                f"Could not patch unexpected VTK charconv compatibility header: {header}"
+            )
+        header.write_text(
+            content.replace(needle, needle + CHARCONV_COMPATIBILITY_PATCH, 1),
+            encoding="utf-8",
+        )
+
+
 def _write_cmake_output(path: Path, vtk_dir: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     escaped = str(vtk_dir).replace("\\", "/")
@@ -168,6 +207,7 @@ def main() -> int:
         _safe_extract(archive, sdk_root)
         stamp.write_text(f"{archive_name}\n", encoding="utf-8")
 
+    _patch_charconv_compatibility(sdk_root)
     vtk_dir = _find_vtk_dir(sdk_root)
     _write_cmake_output(args.cmake_output, vtk_dir)
     print(f"Using VTK SDK: {vtk_dir}", flush=True)

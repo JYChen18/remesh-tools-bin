@@ -81,9 +81,7 @@ class NativeBuildSupportTests(unittest.TestCase):
 
         for sys_platform, machine, expected in cases:
             with self.subTest(platform=sys_platform, machine=machine):
-                self.assertEqual(
-                    self.sdk_archive_name(sys_platform, machine), expected
-                )
+                self.assertEqual(self.sdk_archive_name(sys_platform, machine), expected)
 
     def test_rejects_unsupported_vtk_sdk_targets(self) -> None:
         with (
@@ -110,6 +108,42 @@ class NativeBuildSupportTests(unittest.TestCase):
                 fetch_vtk_sdk._safe_extract(wheel, root / "sdk")
 
             self.assertFalse((root / "outside").exists())
+
+    def test_patches_vtk_charconv_compatibility_idempotently(self) -> None:
+        with tempfile.TemporaryDirectory() as value:
+            root = Path(value)
+            header = root / "include" / "vtkCharConvCompatibility.h"
+            header.parent.mkdir()
+            header.write_text(
+                "\n".join(
+                    (
+                        "#define VTK_HAS_STD_CHARS_FORMAT",
+                        "#define VTK_HAS_STD_FROM_CHARS_RESULT",
+                        "#define VTK_HAS_STD_TO_CHARS_RESULT",
+                        "",
+                        "#if !(defined(VTK_HAS_STD_CHARS_FORMAT))",
+                        "#endif",
+                        "",
+                    )
+                ),
+                encoding="utf-8",
+            )
+
+            fetch_vtk_sdk._patch_charconv_compatibility(root)
+            fetch_vtk_sdk._patch_charconv_compatibility(root)
+
+            content = header.read_text(encoding="utf-8")
+            self.assertEqual(
+                content.count(fetch_vtk_sdk.CHARCONV_COMPATIBILITY_MARKER), 1
+            )
+            self.assertIn(
+                "#if (defined(_GLIBCXX_RELEASE) && _GLIBCXX_RELEASE <= 9)",
+                content,
+            )
+            self.assertLess(
+                content.index(fetch_vtk_sdk.CHARCONV_COMPATIBILITY_MARKER),
+                content.index("#if !(defined(VTK_HAS_STD_CHARS_FORMAT))"),
+            )
 
 
 class OpenVdbPatchTests(unittest.TestCase):
@@ -139,9 +173,9 @@ class OpenVdbPatchTests(unittest.TestCase):
         node_manager = (self.openvdb_dir / "tree" / "NodeManager.h").read_text(
             encoding="utf-8"
         )
-        point_index_grid = (
-            self.openvdb_dir / "tools" / "PointIndexGrid.h"
-        ).read_text(encoding="utf-8")
+        point_index_grid = (self.openvdb_dir / "tools" / "PointIndexGrid.h").read_text(
+            encoding="utf-8"
+        )
         self.assertEqual(node_manager.count("OpT::eval"), 3)
         self.assertNotIn("OpT::template eval", node_manager)
         self.assertIn("BaseLeaf::template merge<Policy>(rhs);", point_index_grid)

@@ -2,14 +2,14 @@
 
 `sim-asset-tools` prepares portable assets for robotics and physics simulation.
 Its `sim-assets` CLI provides standalone mesh processing, object-bundle
-generation, and body-surface generation from compiled MuJoCo models.
+generation, and reusable primitives for higher-level asset workflows.
 
 ## Installation
 
-Install the CLI and all workflows as an isolated tool:
+Add the CLI and library to a project:
 
 ```bash
-uv tool install sim-asset-tools
+uv add sim-asset-tools
 ```
 
 Project wheels support CPython 3.10–3.13 on Linux x86_64 or ARM64, Windows
@@ -21,11 +21,19 @@ x86_64, and macOS 12 or newer on Apple Silicon.
 | --- | --- |
 | `mesh` | Normalize, OpenVDB SDF, ACVD remeshing, CoACD decomposition |
 | `prepare object` / `prepare objects` | GLB, OBJ, PLY, STL to MJCF and/or URDF bundles |
-| `prepare body-surfaces` / `check body-surfaces` | MuJoCo XML, MJCF, or MJB to body-local OBJ surfaces |
 | `check object` | Object-bundle integrity |
 
 See the [runnable examples](https://github.com/JYChen18/sim-asset-tools/blob/main/examples/README.md)
-for CLI commands and `sim-assets --help` for all available options.
+for CLI commands and `uv run sim-assets --help` for all available options.
+
+## Reusable workflow primitives
+
+Higher-level asset packages can build on the public
+`sim_asset_tools.surface` module for OpenVDB-to-ACVD surface generation and
+`sim_asset_tools.publish` for atomic directory publication. Manifest JSON,
+path, and hashing helpers in `sim_asset_tools.formats.manifest` are
+schema-neutral; each workflow owns and validates its persistent format.
+Prepared object bundles use the `sim-asset/object/v1` schema.
 
 ## Third-party software
 
@@ -37,7 +45,6 @@ for CLI commands and `sim-assets --help` for all available options.
 | Boost | `1.81.0` | OpenVDB build dependency | [Boost Software License 1.0](https://github.com/JYChen18/sim-asset-tools/blob/main/licenses/Boost-BSL-1.0.txt) |
 | VTK | `9.6.2` | Native mesh processing runtime | [BSD 3-Clause](https://gitlab.kitware.com/vtk/vtk/-/blob/v9.6.2/Copyright.txt) |
 | CoACD | `>=1.0.11` | Convex decomposition | [MIT](https://github.com/SarahWeiii/CoACD/blob/main/LICENSE) |
-| MuJoCo | `>=3.9.0` | Compiled-model processing | [Apache 2.0](https://github.com/google-deepmind/mujoco/blob/main/LICENSE) |
 
 Code authored for this repository is licensed under the
 [Apache License 2.0](https://github.com/JYChen18/sim-asset-tools/blob/main/LICENSE).

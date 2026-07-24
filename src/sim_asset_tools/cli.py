@@ -58,18 +58,6 @@ def _output_formats(value: str) -> tuple[str, ...]:
     return formats
 
 
-def _body_surface_recipe(args: argparse.Namespace):
-    from .workflows import BodySurfaceRecipe
-
-    return BodySurfaceRecipe(
-        resolution=args.resolution,
-        level_set=args.level_set,
-        target_vertices=args.vertices,
-        gradation=args.gradation,
-        force_manifold=args.force_manifold,
-    )
-
-
 def _mesh_normalize(args: argparse.Namespace) -> int:
     from .mesh.io import load_mesh
     from .mesh.normalize import normalize_mesh
@@ -120,7 +108,7 @@ def _mesh_acvd(args: argparse.Namespace) -> int:
 def _mesh_coacd(args: argparse.Namespace) -> int:
     from .mesh.coacd import decompose_mesh
     from .mesh.io import load_mesh
-    from ._publish import (
+    from .publish import (
         ensure_safe_output,
         staged_directory,
     )
@@ -176,20 +164,6 @@ def _prepare_objects(args: argparse.Namespace) -> int:
     return 0
 
 
-def _prepare_body_surfaces(args: argparse.Namespace) -> int:
-    from .workflows import prepare_body_surfaces
-
-    path = prepare_body_surfaces(
-        args.model,
-        args.output,
-        recipe=_body_surface_recipe(args),
-        bodies=args.body,
-        overwrite=args.overwrite,
-    )
-    print(path)
-    return 0
-
-
 def _check_object(args: argparse.Namespace) -> int:
     from .workflows import check_object
 
@@ -199,18 +173,6 @@ def _check_object(args: argparse.Namespace) -> int:
             print(f"error: {error}")
         return 1
     print(f"ok: {args.asset}")
-    return 0
-
-
-def _check_body_surfaces(args: argparse.Namespace) -> int:
-    from .workflows import check_body_surfaces
-
-    errors = check_body_surfaces(args.model, args.assets, bodies=args.body)
-    if errors:
-        for error in errors:
-            print(f"error: {error}")
-        return 1
-    print(f"ok: {args.assets}")
     return 0
 
 
@@ -283,16 +245,6 @@ def _build_parser() -> argparse.ArgumentParser:
     objects_parser.add_argument("--overwrite", action="store_true")
     objects_parser.set_defaults(func=_prepare_objects)
 
-    body_surfaces = prepare_commands.add_parser(
-        "body-surfaces", help="prepare body-local collision surfaces"
-    )
-    body_surfaces.add_argument("model")
-    body_surfaces.add_argument("--output", required=True)
-    body_surfaces.add_argument("--body", action="append")
-    _add_surface_parameters(body_surfaces)
-    body_surfaces.add_argument("--overwrite", action="store_true")
-    body_surfaces.set_defaults(func=_prepare_body_surfaces)
-
     check = commands.add_parser("check", help="validate prepared assets")
     check_commands = check.add_subparsers(dest="check_command", required=True)
 
@@ -300,13 +252,6 @@ def _build_parser() -> argparse.ArgumentParser:
     check_object.add_argument("asset")
     check_object.set_defaults(func=_check_object)
 
-    check_surfaces = check_commands.add_parser(
-        "body-surfaces", help="check body-surface assets"
-    )
-    check_surfaces.add_argument("model")
-    check_surfaces.add_argument("--assets", required=True)
-    check_surfaces.add_argument("--body", action="append")
-    check_surfaces.set_defaults(func=_check_body_surfaces)
     return parser
 
 

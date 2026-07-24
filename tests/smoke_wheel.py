@@ -12,7 +12,6 @@ from sim_asset_tools.native import _native_env, _tool_path, run_native
 
 
 FIXTURE = Path(__file__).resolve().parent / "fixtures" / "tetrahedron.obj"
-MODEL_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "two_boxes.xml"
 EXPECTED_NATIVE_TOOLS = {
     "ACVD",
     "ACVDP",
@@ -220,19 +219,25 @@ def run_coacd(temporary_path: Path) -> None:
         require_output(part)
 
 
-def run_mujoco_model_loading() -> None:
-    from sim_asset_tools.formats.mujoco_model import load_mujoco_model
+def run_public_workflow_primitives(temporary_path: Path) -> None:
+    from sim_asset_tools.publish import staged_directory
+    from sim_asset_tools.surface import SurfaceRecipe
 
-    model = load_mujoco_model(MODEL_FIXTURE)
-    if model.nbody != 2 or model.ngeom != 2:
-        raise RuntimeError("MuJoCo smoke test loaded an unexpected model")
+    recipe = SurfaceRecipe(target_vertices=64)
+    if recipe.target_vertices != 64:
+        raise RuntimeError("SurfaceRecipe smoke test returned unexpected settings")
+
+    output_directory = temporary_path / "published"
+    with staged_directory(output_directory, overwrite=False) as staging_directory:
+        (staging_directory / "ready.txt").write_text("ready\n", encoding="utf-8")
+    require_output(output_directory / "ready.txt")
 
 
 def run() -> None:
     verify_installed_tools()
-    run_mujoco_model_loading()
     with tempfile.TemporaryDirectory() as temporary_directory:
         temporary_path = Path(temporary_directory)
+        run_public_workflow_primitives(temporary_path)
         openvdb_output = temporary_path / "openvdb.obj"
 
         openvdb_result = sim_assets_main(

@@ -2,16 +2,14 @@
 
 from .manifest import (
     MANIFEST_NAME,
-    OBJECT_SCHEMA_VERSION,
-    SCHEMA_VERSION,
     load_manifest,
     sha256_json,
 )
+from .object_manifest import OBJECT_MANIFEST_SCHEMA
 
 __all__ = [
     "MANIFEST_NAME",
-    "OBJECT_SCHEMA_VERSION",
-    "SCHEMA_VERSION",
+    "OBJECT_MANIFEST_SCHEMA",
     "load_manifest",
     "sha256_json",
 ]

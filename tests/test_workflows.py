@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import importlib.util
 import json
 import tempfile
@@ -11,7 +12,6 @@ _HAS_MESH_DEPS = all(
     importlib.util.find_spec(name) is not None
     for name in ("coacd", "numpy", "trimesh", "vtkmodules")
 )
-_HAS_MODEL_DEPS = _HAS_MESH_DEPS and importlib.util.find_spec("mujoco") is not None
 
 
 @unittest.skipUnless(_HAS_MESH_DEPS, "requires mesh dependencies")
@@ -46,7 +46,12 @@ class ObjectWorkflowTests(unittest.TestCase):
     def test_prepare_object_writes_a_valid_versioned_bundle(self) -> None:
         import trimesh
 
-        from sim_asset_tools.formats.manifest import sha256_json
+        from sim_asset_tools.formats.manifest import (
+            sha256_directory,
+            sha256_file,
+            sha256_json,
+        )
+        from sim_asset_tools.formats.object_manifest import OBJECT_MANIFEST_SCHEMA
         from sim_asset_tools.mesh import load_mesh
         from sim_asset_tools.workflows import check_object, prepare_object
         from sim_asset_tools.workflows import object as object_workflow
@@ -66,8 +71,14 @@ class ObjectWorkflowTests(unittest.TestCase):
                 result = prepare_object(source, root / "asset")
 
             manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
-            self.assertEqual(manifest["schema"], "sim-object/v1")
+            pristine_manifest = copy.deepcopy(manifest)
+            collision_contents = {
+                path.name: path.read_bytes()
+                for path in (result.output_directory / "collision").glob("*.obj")
+            }
+            self.assertEqual(manifest["schema"], OBJECT_MANIFEST_SCHEMA)
             self.assertNotIn("kind", manifest)
+            self.assertEqual(manifest["surfaces"], {"object": "visual.obj"})
             geometry = manifest["geometry"]
             self.assertGreater(geometry["volume"], 0)
             self.assertEqual(len(geometry["center_of_mass"]), 3)
@@ -85,7 +96,8 @@ class ObjectWorkflowTests(unittest.TestCase):
                 {"source.obj", "visual.obj"},
             )
             self.assertTrue(
-                {"schema", "geometry", "recipe", "sha256"} <= manifest["sha256"].keys()
+                {"schema", "geometry", "surfaces", "recipe", "sha256"}
+                <= manifest["sha256"].keys()
             )
             other_hashes = {
                 name: digest
@@ -115,6 +127,14 @@ class ObjectWorkflowTests(unittest.TestCase):
             collision_path.write_bytes(original_collision)
             self.assertEqual(check_object(result.output_directory), [])
 
+            manifest["surfaces"]["object"] = "source.obj"
+            result.manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            self.assertIn(
+                "manifest surfaces fingerprint does not match",
+                check_object(result.output_directory),
+            )
+
+            manifest["surfaces"]["object"] = "visual.obj"
             manifest["geometry"]["volume"] *= 2.0
             result.manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
             self.assertIn(
@@ -129,6 +149,98 @@ class ObjectWorkflowTests(unittest.TestCase):
                 check_object(result.output_directory),
             )
 
+            def publish_rehashed(value: dict[str, object]) -> None:
+                hashes = value["sha256"]
+                assert isinstance(hashes, dict)
+                hashes["collision"] = sha256_directory(
+                    result.output_directory / "collision"
+                )
+                for name in ("schema", "geometry", "surfaces", "recipe"):
+                    hashes[name] = sha256_json(value[name])
+                for relative in tuple(hashes):
+                    if relative in {
+                        "schema",
+                        "geometry",
+                        "surfaces",
+                        "recipe",
+                        "collision",
+                        "sha256",
+                    }:
+                        continue
+                    hashes[relative] = sha256_file(result.output_directory / relative)
+                hashes["sha256"] = sha256_json(
+                    {
+                        name: digest
+                        for name, digest in hashes.items()
+                        if name != "sha256"
+                    }
+                )
+                result.manifest_path.write_text(
+                    json.dumps(value),
+                    encoding="utf-8",
+                )
+
+            manifest = copy.deepcopy(pristine_manifest)
+            manifest["geometry"] = []
+            publish_rehashed(manifest)
+            self.assertIn(
+                "manifest geometry must be an object",
+                check_object(result.output_directory),
+            )
+
+            manifest = copy.deepcopy(pristine_manifest)
+            visual_path = result.output_directory / "visual.obj"
+            visual_bytes = visual_path.read_bytes()
+            visual_path.write_text("not an OBJ mesh\n", encoding="utf-8")
+            publish_rehashed(manifest)
+            self.assertTrue(
+                any(
+                    error.startswith("visual could not be loaded:")
+                    for error in check_object(result.output_directory)
+                )
+            )
+
+            visual_path.write_bytes(visual_bytes)
+            manifest = copy.deepcopy(pristine_manifest)
+            for collision_path in (result.output_directory / "collision").glob("*.obj"):
+                collision_path.unlink()
+            publish_rehashed(manifest)
+            self.assertIn(
+                "collision directory must contain at least one OBJ mesh",
+                check_object(result.output_directory),
+            )
+
+            for name, content in collision_contents.items():
+                (result.output_directory / "collision" / name).write_bytes(content)
+            (result.output_directory / "collision" / "notes.txt").write_text(
+                "unexpected\n",
+                encoding="utf-8",
+            )
+            manifest = copy.deepcopy(pristine_manifest)
+            publish_rehashed(manifest)
+            self.assertIn(
+                "unexpected collision artifact: collision/notes.txt",
+                check_object(result.output_directory),
+            )
+
+            (result.output_directory / "collision" / "notes.txt").unlink()
+            result.manifest_path.write_text(
+                json.dumps(pristine_manifest),
+                encoding="utf-8",
+            )
+            collision_link = result.output_directory / "collision" / "outside.obj"
+            try:
+                collision_link.symlink_to(source)
+            except (NotImplementedError, OSError):
+                pass
+            else:
+                errors = check_object(result.output_directory)
+                self.assertTrue(
+                    any("symbolic link" in error for error in errors),
+                    errors,
+                )
+                collision_link.unlink()
+
     def test_check_object_reports_malformed_records(self) -> None:
         from sim_asset_tools import cli
         from sim_asset_tools.workflows import check_object
@@ -138,10 +250,11 @@ class ObjectWorkflowTests(unittest.TestCase):
             (root / "asset.json").write_text(
                 json.dumps(
                     {
-                        "schema": "sim-object/v1",
+                        "schema": "sim-asset/object/v1",
                         "geometry": "invalid",
                         "sha256": {},
                         "recipe": {},
+                        "surfaces": "invalid",
                     }
                 ),
                 encoding="utf-8",
@@ -151,124 +264,21 @@ class ObjectWorkflowTests(unittest.TestCase):
 
             self.assertIn("manifest sha256 is missing the geometry fingerprint", errors)
             self.assertIn("manifest sha256 is missing the sha256 fingerprint", errors)
+            self.assertIn("manifest geometry must be an object", errors)
             self.assertEqual(cli.main(["check", "object", str(root)]), 1)
 
-
-@unittest.skipUnless(_HAS_MODEL_DEPS, "requires MuJoCo and mesh dependencies")
-class BodySurfaceWorkflowTests(unittest.TestCase):
-    def test_manifest_maps_model_body_names_to_portable_paths(self) -> None:
-        from sim_asset_tools.mesh import load_mesh
-        from sim_asset_tools.workflows import check_body_surfaces, prepare_body_surfaces
-        from sim_asset_tools.workflows import body_surfaces as body_surface_workflow
+    def test_check_object_rejects_unknown_schema(self) -> None:
+        from sim_asset_tools.workflows import check_object
 
         with tempfile.TemporaryDirectory() as value:
             root = Path(value)
-            model_path = root / "scene.xml"
-            model_path.write_text(
-                """
-                <mujoco>
-                  <worldbody>
-                    <body name="hand/forearm">
-                      <freejoint/>
-                      <geom type="box" size="0.1 0.1 0.1"/>
-                      <geom type="box" size="0.1 0.1 0.1" pos="0.1 0 0"/>
-                    </body>
-                  </worldbody>
-                </mujoco>
-                """,
+            (root / "asset.json").write_text(
+                json.dumps({"schema": "sim-asset/object/v2"}),
                 encoding="utf-8",
             )
 
-            def copy_source(source, output, *_args):
-                load_mesh(source).export(output)
-                return output
-
-            with mock.patch.object(
-                body_surface_workflow, "prepare_surface", side_effect=copy_source
-            ):
-                manifest_path = prepare_body_surfaces(model_path, root / "derived")
-
-            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-            self.assertEqual(manifest["contract"], "body-surfaces/v1")
-            self.assertEqual(set(manifest["bodies"]), {"hand/forearm"})
-            mesh_path = manifest["bodies"]["hand/forearm"]["mesh"]["path"]
-            self.assertNotIn("hand/forearm", mesh_path)
-            self.assertTrue((manifest_path.parent / mesh_path).is_file())
-            self.assertEqual(check_body_surfaces(model_path, manifest_path), [])
-
-    def test_overwrite_is_atomic_and_removes_stale_body_meshes(self) -> None:
-        import trimesh
-
-        from sim_asset_tools.mesh import load_mesh
-        from sim_asset_tools.workflows import (
-            BodySurfaceRecipe,
-            check_body_surfaces,
-            prepare_body_surfaces,
-        )
-        from sim_asset_tools.workflows import body_surfaces as body_surface_workflow
-
-        with tempfile.TemporaryDirectory() as value:
-            root = Path(value)
-            model_path = root / "scene.xml"
-            model_path.write_text(
-                """
-                <mujoco>
-                  <worldbody>
-                    <body name="one"><freejoint/><geom type="box" size=".1 .1 .1"/></body>
-                    <body name="two"><freejoint/><geom type="box" size=".1 .1 .1"/></body>
-                  </worldbody>
-                </mujoco>
-                """,
-                encoding="utf-8",
-            )
-
-            def copy_source(source, output, *_args):
-                load_mesh(source).export(output)
-                return output
-
-            output_directory = root / "assets"
-            with mock.patch.object(
-                body_surface_workflow, "prepare_surface", side_effect=copy_source
-            ):
-                manifest_path = prepare_body_surfaces(model_path, output_directory)
-
-            calls = 0
-
-            def fail_second(_source, output, *_args):
-                nonlocal calls
-                calls += 1
-                if calls == 2:
-                    raise RuntimeError("injected failure")
-                trimesh.creation.icosphere().export(output)
-                return output
-
-            with (
-                mock.patch.object(
-                    body_surface_workflow, "prepare_surface", side_effect=fail_second
-                ),
-                self.assertRaisesRegex(RuntimeError, "injected failure"),
-            ):
-                prepare_body_surfaces(
-                    model_path,
-                    output_directory,
-                    recipe=BodySurfaceRecipe(target_vertices=64),
-                    overwrite=True,
-                )
-
-            self.assertEqual(check_body_surfaces(model_path, manifest_path), [])
-            self.assertEqual(list(root.glob(".assets.staging-*")), [])
-
-            with mock.patch.object(
-                body_surface_workflow, "prepare_surface", side_effect=copy_source
-            ):
-                prepare_body_surfaces(
-                    model_path,
-                    output_directory,
-                    bodies=["one"],
-                    overwrite=True,
-                )
-
-            self.assertEqual(len(list((output_directory / "meshes").glob("*.obj"))), 1)
+            with self.assertRaisesRegex(ValueError, "Regenerate the object bundle"):
+                check_object(root)
 
 
 if __name__ == "__main__":
